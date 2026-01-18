@@ -336,7 +336,7 @@
     const lineControls = Array.from({length:maxCols},(_,i)=>{
       const c = i+1;
       if(capacity===2){
-        return `<div class="line-ctrl two"><div class="line-label">خط ${c}</div><div class="line-pair"><select class="line-stage-a" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select><select class="line-stage-b" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div></div>`;
+        return `<div class="line-ctrl two"><div class="line-label">خط ${c}</div><div class="line-pair"><div class="pair-item"><div class="pair-title">طالب 1 (يمين)</div><select class="line-stage-a" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div><div class="pair-item"><div class="pair-title">طالب 2 (يسار)</div><select class="line-stage-b" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div></div></div>`;
       }
       return `<div class="line-ctrl"><div class="line-label">خط ${c}</div><select class="line-stage" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>`;
     }).join('');
@@ -484,28 +484,15 @@
       for(let c=1;c<=maxCols;c++){
         const aSel = document.querySelector(`#seats-${hid}-${sid} .line-stage-a[data-col="${c}"]`);
         const bSel = document.querySelector(`#seats-${hid}-${sid} .line-stage-b[data-col="${c}"]`);
-        let aStage = aSel?.value || '';
-        let bStage = bSel?.value || '';
-        if(!bStage || bStage===aStage){
-          const stages = uniqueStages();
-          const alt = stages.find(s=> s!==aStage);
-          bStage = alt || bStage || aStage;
-        }
+        const aStage = aSel?.value || '';
+        const bStage = bSel?.value || '';
         for(let r=1;r<=rows.length;r++){
           const seatsInRow = rows[r-1]?.seats||0; if(c>seatsInRow) continue;
           const seatId = `${hid}:${sid}:${r}:${c}`;
           const sA = aStage? takeFromStage(aStage) : null;
           const sB = bStage? takeFromStage(bStage) : null;
           if(sA && sB){ state.data.assignments[seatId] = [sA.id, sB.id]; }
-          else if(sA){
-            // محاولة ملء الثاني بمرحلة مختلفة عن الأول
-            const firstStage = sA.stage||'';
-            let sDiff = null;
-            for(let i=0;i<students.length;i++){
-              if(!isAssigned(students[i].id) && (students[i].stage||'')!==firstStage){ sDiff = students.splice(i,1)[0]; break; }
-            }
-            state.data.assignments[seatId] = sDiff? [sA.id, sDiff.id] : [sA.id];
-          }
+          else if(sA){ state.data.assignments[seatId] = [sA.id]; }
         }
       }
     }
