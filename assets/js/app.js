@@ -2,7 +2,16 @@
 (function(){
   const state = {
     data: StorageAPI.load(),
-    settings: Object.assign({ theme:'light', backupLimit: 10 }, StorageAPI.loadSettings()),
+    settings: Object.assign({
+      theme:'light',
+      backupLimit: 10,
+      schoolName:'',
+      schoolType:'بنين',
+      academicYear:'',
+      principalName:'',
+      committeeHead:'',
+      logoDataUrl:''
+    }, StorageAPI.loadSettings()),
     filter:{ studentQuery:'' }
   };
 
@@ -58,6 +67,56 @@
       el.className='row';
       el.textContent = d.toLocaleString('ar-IQ');
       host.appendChild(el);
+    });
+  }
+
+  // ==== School Info (Dashboard) ====
+  function initSchoolInfo(){
+    const s = state.settings;
+    const nameEl = $('#schName');
+    const typeEl = $('#schType');
+    const yearEl = $('#schYear');
+    const principalEl = $('#schPrincipal');
+    const committeeEl = $('#schCommittee');
+    const logoInput = $('#schLogo');
+    const logoPreview = $('#schLogoPreview');
+    const clearLogoBtn = $('#btnClearLogo');
+
+    if(nameEl) nameEl.value = s.schoolName||'';
+    if(typeEl) typeEl.value = s.schoolType||'بنين';
+    if(yearEl) yearEl.value = s.academicYear||'';
+    if(principalEl) principalEl.value = s.principalName||'';
+    if(committeeEl) committeeEl.value = s.committeeHead||'';
+    if(logoPreview){
+      if(s.logoDataUrl){ logoPreview.src = s.logoDataUrl; logoPreview.style.display = 'block'; }
+      else { logoPreview.src=''; logoPreview.style.display = 'none'; }
+    }
+
+    function saveSettings(){ StorageAPI.saveSettings(state.settings); }
+
+    if(nameEl) nameEl.addEventListener('input', ()=>{ state.settings.schoolName = nameEl.value.trim(); saveSettings(); });
+    if(typeEl) typeEl.addEventListener('change', ()=>{ state.settings.schoolType = typeEl.value; saveSettings(); });
+    if(yearEl) yearEl.addEventListener('input', ()=>{ state.settings.academicYear = yearEl.value.trim(); saveSettings(); });
+    if(principalEl) principalEl.addEventListener('input', ()=>{ state.settings.principalName = principalEl.value.trim(); saveSettings(); });
+    if(committeeEl) committeeEl.addEventListener('input', ()=>{ state.settings.committeeHead = committeeEl.value.trim(); saveSettings(); });
+
+    if(logoInput) logoInput.addEventListener('change', ()=>{
+      const file = logoInput.files?.[0];
+      if(!file){ return; }
+      if(!file.type.startsWith('image/')){ alert('الرجاء اختيار صورة للشعار'); return; }
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        state.settings.logoDataUrl = String(reader.result||'');
+        saveSettings();
+        if(logoPreview){ logoPreview.src = state.settings.logoDataUrl; logoPreview.style.display = 'block'; }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if(clearLogoBtn) clearLogoBtn.addEventListener('click', ()=>{
+      state.settings.logoDataUrl = '';
+      saveSettings();
+      if(logoPreview){ logoPreview.src=''; logoPreview.style.display='none'; }
     });
   }
 
@@ -979,6 +1038,7 @@
     initHalls();
     initIO();
     initSettings();
+    initSchoolInfo();
     initPicker();
     renderStudents();
     renderHalls();

@@ -70,6 +70,46 @@
       </div>
 
       <div class="card neo mt">
+        <h3>معلومات المدرسة</h3>
+        <div class="form-grid">
+          <label>
+            <span>اسم المدرسة</span>
+            <input type="text" id="schName" placeholder="مثال: ثانوية الرافدين" />
+          </label>
+          <label>
+            <span>امتدادها</span>
+            <select id="schType">
+              <option value="بنين">بنين</option>
+              <option value="بنات">بنات</option>
+              <option value="مختلطة">مختلطة</option>
+            </select>
+          </label>
+          <label>
+            <span>العام الدراسي</span>
+            <input type="text" id="schYear" placeholder="مثال: 2025-2026" />
+          </label>
+          <label>
+            <span>مدير المدرسة</span>
+            <input type="text" id="schPrincipal" placeholder="اسم المدير" />
+          </label>
+          <label>
+            <span>رئيس اللجنة الامتحانية</span>
+            <input type="text" id="schCommittee" placeholder="اسم رئيس اللجنة" />
+          </label>
+          <div class="actions">
+            <label style="display:flex; align-items:center; gap:.5rem">
+              <span>شعار المدرسة (إن وجد)</span>
+              <input type="file" id="schLogo" accept="image/*" />
+            </label>
+            <button class="btn btn-ghost" type="button" id="btnClearLogo"><i class="bi bi-trash"></i><span>إزالة الشعار</span></button>
+          </div>
+          <div style="grid-column:1/-1">
+            <img id="schLogoPreview" alt="شعار المدرسة" style="max-height:90px; border-radius:12px; display:none" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card neo mt">
         <h3>آخر النسخ الاحتياطية</h3>
         <div id="backupList" class="backup-list"></div>
       </div>
