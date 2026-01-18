@@ -343,12 +343,17 @@
     const visibleCols = Math.min(maxCols||1, 4);
     const stages = uniqueStages();
     const capacity = sec.seatCapacity===2?2:1;
+    const storedSingle = sec?.colStages || [];
+    const storedA = sec?.colStagesA || [];
+    const storedB = sec?.colStagesB || [];
     const lineControls = Array.from({length:visibleCols},(_,i)=>{
       const c = i+1;
       if(capacity===2){
-        return `<div class="line-ctrl two"><div class="line-label">خط ${c}</div><div class="line-pair"><div class="pair-item"><div class="pair-title">طالب 1 (يمين)</div><select class="line-stage-a" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div><div class="pair-item"><div class="pair-title">طالب 2 (يسار)</div><select class="line-stage-b" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div></div></div>`;
+        const selA = storedA[i]||''; const selB = storedB[i]||'';
+        return `<div class="line-ctrl two"><div class="line-label">خط ${c}</div><div class="line-pair"><div class="pair-item"><div class="pair-title">طالب 1 (يمين)</div><select class="line-stage-a" data-col="${c}">${stages.map(s=>`<option value="${s}" ${selA===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="pair-item"><div class="pair-title">طالب 2 (يسار)</div><select class="line-stage-b" data-col="${c}">${stages.map(s=>`<option value="${s}" ${selB===s?'selected':''}>${s}</option>`).join('')}</select></div></div></div>`;
       }
-      return `<div class="line-ctrl"><div class="line-label">خط ${c}</div><select class="line-stage" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>`;
+      const sel = storedSingle[i]||'';
+      return `<div class="line-ctrl"><div class="line-label">خط ${c}</div><select class="line-stage" data-col="${c}">${stages.map(s=>`<option value="${s}" ${sel===s?'selected':''}>${s}</option>`).join('')}</select></div>`;
     }).join('');
 
     const header = `<div class="line-controls" style="grid-column:1/-1; grid-template-columns:repeat(${visibleCols}, 1fr)">${lineControls}</div><div class="line-actions" style="grid-column:1/-1"><button class="btn" id="applyLines-${hid}-${sid}">تطبيق التوزيع حسب الخطوط</button></div>`;
@@ -497,9 +502,11 @@
     };
     clearSectorAssignments(hid, sid);
     if(cap===1){
+      const chosenStages = [];
       for(let c=1;c<=visibleCols;c++){
         const sel = document.querySelector(`#seats-${hid}-${sid} .line-stage[data-col="${c}"]`);
-        const stg = sel?.value; if(!stg) continue;
+        const stg = sel?.value; if(stg) chosenStages[c-1] = stg; else chosenStages[c-1] = '';
+        if(!stg) continue;
         for(let r=1;r<=rows.length;r++){
           const seatsInRow = rows[r-1]?.seats||0; if(c>seatsInRow) continue;
           const seatId = `${hid}:${sid}:${r}:${c}`;
@@ -507,12 +514,15 @@
           state.data.assignments[seatId] = s.id;
         }
       }
+      sec.colStages = chosenStages;
     } else {
+      const chosenA = []; const chosenB = [];
       for(let c=1;c<=visibleCols;c++){
         const aSel = document.querySelector(`#seats-${hid}-${sid} .line-stage-a[data-col="${c}"]`);
         const bSel = document.querySelector(`#seats-${hid}-${sid} .line-stage-b[data-col="${c}"]`);
-        const aStage = aSel?.value || '';
-        const bStage = bSel?.value || '';
+        let aStage = aSel?.value || '';
+        let bStage = bSel?.value || '';
+        chosenA[c-1] = aStage; chosenB[c-1] = bStage;
         for(let r=1;r<=rows.length;r++){
           const seatsInRow = rows[r-1]?.seats||0; if(c>seatsInRow) continue;
           const seatId = `${hid}:${sid}:${r}:${c}`;
@@ -522,6 +532,7 @@
           else if(sA){ state.data.assignments[seatId] = [sA.id]; }
         }
       }
+      sec.colStagesA = chosenA; sec.colStagesB = chosenB;
     }
   }
 

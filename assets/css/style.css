@@ -77,7 +77,7 @@ body{
 /* Halls */
 .hall-card{margin-bottom:1rem}
 .hall-header{display:flex; gap:.6rem; align-items:center; justify-content:space-between}
-.sectors{display:grid; grid-template-columns:repeat(2,1fr); gap:.75rem; margin-top:.75rem}
+.sectors{display:grid; grid-template-columns:1fr; gap:.75rem; margin-top:.75rem}
 .sector{padding:1rem}
 .sector h4{margin:.2rem 0 .8rem}
 .row-config{display:grid; grid-template-columns:1fr 1fr; gap:.5rem}
