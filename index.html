@@ -208,6 +208,21 @@
     </div>
   </div>
 
+  <!-- نافذة خيارات التوزيع التلقائي -->
+  <div id="autoOptions" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel neo">
+      <div class="modal-header">
+        <h3>خيارات التوزيع التلقائي</h3>
+        <button class="btn btn-ghost" id="autoClose"><i class="bi bi-x"></i></button>
+      </div>
+      <div id="autoBody" class="modal-tools"></div>
+      <div class="modal-footer">
+        <button class="btn btn-neo" id="autoRun"><i class="bi bi-magic"></i><span>تنفيذ التوزيع</span></button>
+      </div>
+    </div>
+  </div>
+
   <!-- SheetJS للتعامل مع Excel (اختياري عند توفر الإنترنت) -->
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="assets/js/storage.js"></script>

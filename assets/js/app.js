@@ -148,6 +148,7 @@
           <div class="actions" style="margin-bottom:.5rem">
             <button class="btn btn-ghost" data-edit-sector="${h.id}:${sec.id}"><i class="bi bi-pencil"></i><span>تعديل اسم القطاع</span></button>
             <button class="btn btn-ghost" data-del-sector="${h.id}:${sec.id}"><i class="bi bi-trash"></i><span>حذف القطاع</span></button>
+            <button class="btn btn-ghost" data-clear-sector="${h.id}:${sec.id}"><i class="bi bi-eraser"></i><span>تفريغ القطاع</span></button>
           </div>
           <div class="row-config">
             <label><span>عدد الصفوف (الخطوط)</span><input type="number" min="1" value="${sec.rows?.length||2}" data-sect-rows="${h.id}:${sec.id}" /></label>
@@ -285,6 +286,16 @@
       });
     });
 
+    wrap.querySelectorAll('[data-clear-sector]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const [hid,sid] = btn.getAttribute('data-clear-sector').split(':');
+        if(!confirm('تفريغ جميع المقاعد في هذا القطاع؟')) return;
+        Object.keys(state.data.assignments||{}).forEach(k=>{ if(k.startsWith(`${hid}:${sid}:`)) delete state.data.assignments[k]; });
+        saveAll({withBackup:true});
+        renderSeats(hid, sid);
+      });
+    });
+
     wrap.querySelectorAll('[data-generate]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const [hid,sid] = btn.getAttribute('data-generate').split(':');
@@ -295,9 +306,7 @@
     wrap.querySelectorAll('[data-autoassign]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const [hid,sid] = btn.getAttribute('data-autoassign').split(':');
-        autoAssign(hid, sid);
-        renderSeats(hid, sid);
-        saveAll({withBackup:true});
+        openAutoOptions(hid, sid);
       });
     });
 
@@ -327,19 +336,23 @@
         const [s1,s2] = [seat.students[0], seat.students[1]];
         const st1 = state.data.students.find(x=>x.id===s1);
         const st2 = state.data.students.find(x=>x.id===s2);
-        const n1 = st1? `${st1.name} <span class=\"badge\">${st1.className||''}</span>` : '<span class="muted">فارغ</span>';
-        const n2 = st2? `${st2.name} <span class=\"badge\">${st2.className||''}</span>` : '<span class="muted">فارغ</span>';
+        const n1 = st1? `${st1.name}` : '<span class=\"muted\">فارغ</span>';
+        const n2 = st2? `${st2.name}` : '<span class=\"muted\">فارغ</span>';
         return `<div class="seat two" draggable="true" data-seat="${seat.seatId}">
           <div class="label">${seat.label}</div>
-          <div class="names"><div class="slot">${n1}</div><div class="slot">${n2}</div></div>
+          <div class="names">
+            <div class="slot"><div class="name">${n1}</div><div class="meta">${st1? `${st1.stage||''} ${st1.className||''}`:''}</div></div>
+            <div class="slot"><div class="name">${n2}</div><div class="meta">${st2? `${st2.stage||''} ${st2.className||''}`:''}</div></div>
+          </div>
         </div>`;
       } else {
         const s = seat.students[0];
         const st = state.data.students.find(x=>x.id===s);
-        const name = st? `${st.name} <span class=\"badge\">${st.className||''}</span>` : '<span class="muted">فارغ</span>';
+        const name = st? `${st.name}` : '<span class=\"muted\">فارغ</span>';
         return `<div class="seat" draggable="true" data-seat="${seat.seatId}">
           <div class="label">${seat.label}</div>
           <div class="name">${name}</div>
+          <div class="meta">${st? `${st.stage||''} ${st.className||''}`:''}</div>
         </div>`;
       }
     }).join('');
@@ -454,6 +467,17 @@
     }
 
     const capacity = sec.seatCapacity===2?2:1;
+    function pickDifferentStage(currentStage){
+      // ابحث في كل المجموعات عن طالب بمرحلة مختلفة
+      const entries = Array.from(groups.entries()).filter(([,arr])=>arr.length>0)
+        .sort((a,b)=> b[1].length - a[1].length);
+      for(const [,arr] of entries){
+        const idx = arr.findIndex(s=> (s.stage||'') !== (currentStage||''));
+        if(idx>=0){ const s = arr.splice(idx,1)[0]; return s; }
+      }
+      return null;
+    }
+
     for(const seat of seatList){
       const avoidBase = getNeighborsClasses(seat.row, seat.col);
       const seatClasses = new Set();
@@ -462,12 +486,157 @@
         const avoid = [...avoidBase, ...seatClasses];
         const cls = pickClass(avoid);
         if(cls==null) break;
-        const st = groups.get(cls).pop();
+        let st = groups.get(cls).pop();
+        if(capacity===2 && slot===1){
+          // حاول اختيار طالب بمرحلة مختلفة عن الأول
+          const firstStage = (arr.length? state.data.students.find(x=>x.id===arr[0])?.stage : null);
+          if(firstStage && (st.stage||'')===firstStage){
+            const alt = pickDifferentStage(firstStage);
+            if(alt) st = alt;
+          }
+        }
         arr.push(st.id);
         seatClasses.add(cls);
       }
       if(arr.length) state.data.assignments[seat.seatId] = arr;
       classAtPos.set(`${seat.row},${seat.col}`, Array.from(seatClasses));
+    }
+  }
+
+  // ===== Auto-Assign Options Modal =====
+  function uniqueStages(){
+    return Array.from(new Set(state.data.students.map(s=> (s.stage||'').trim()).filter(Boolean)));
+  }
+
+  function openAutoOptions(hid, sid){
+    const hall = state.data.halls.find(h=>h.id===hid);
+    const sec = hall?.sectors?.find(s=>s.id===sid);
+    const cap = sec?.seatCapacity===2?2:1;
+    const stages = uniqueStages();
+    const host = document.getElementById('autoBody');
+    const rowSelects = (sec.rows||[]).map((_,i)=>`<label><span>مرحلة صف ${i+1}</span><select data-row-stage="${i+1}">${stages.map(st=>`<option value="${st}">${st}</option>`).join('')}</select></label>`).join('');
+    const maxCols = Math.max(...(sec.rows||[]).map(r=>r.seats));
+    const colSelects = Array.from({length:maxCols},(_,i)=>`<label><span>مرحلة خط ${i+1}</span><select data-col-stage="${i+1}">${stages.map(st=>`<option value="${st}">${st}</option>`).join('')}</select></label>`).join('');
+    const colPairSelects = Array.from({length:maxCols},(_,i)=>`<div class="row-config" style="grid-template-columns:1fr 1fr"><label><span>مرحلة الطالب الأول (خط ${i+1})</span><select data-col-stage-a="${i+1}">${stages.map(st=>`<option value="${st}">${st}</option>`).join('')}</select></label><label><span>مرحلة الطالب الثاني (خط ${i+1})</span><select data-col-stage-b="${i+1}">${stages.map(st=>`<option value="${st}">${st}</option>`).join('')}</select></label></div>`).join('');
+    host.innerHTML = `
+      <div class="form-grid">
+        <label><input type="radio" name="autoMode" value="mixed" checked> <span>توزيع ذكي (تفادي تلاصق الشُعب، ومراحل مختلفة داخل المقعد الثنائي)</span></label>
+        ${cap===2? `<label><input type="radio" name="autoMode" value="pairStages"> <span>طالبان بمراحل محددة</span></label>
+          <div class="sub" data-mode="pairStages">
+            <label><span>مرحلة الطالب الأول</span><select id="pairStageA">${stages.map(st=>`<option value="${st}">${st}</option>`).join('')}</select></label>
+            <label><span>مرحلة الطالب الثاني</span><select id="pairStageB">${stages.map(st=>`<option value="${st}">${st}</option>`).join('')}</select></label>
+          </div>` : ''}
+        ${cap===1? `<label><input type="radio" name="autoMode" value="rowStage"> <span>مرحلة واحدة لكل صف</span></label>
+          <div class="sub" data-mode="rowStage">${rowSelects}</div>
+          <label><input type="radio" name="autoMode" value="colStage"> <span>مرحلة واحدة لكل خط (عمود)</span></label>
+          <div class="sub" data-mode="colStage">${colSelects}</div>` : `<label><input type="radio" name="autoMode" value="colStage"> <span>مراحل لكل خط (عمود) مع اختلاف داخل المقعد</span></label>
+          <div class="sub" data-mode="colStage">${colPairSelects}</div>`}
+        <label><input type="radio" name="autoMode" value="singleStage"> <span>الجميع من نفس المرحلة</span></label>
+        <div class="sub" data-mode="singleStage"><label><span>المرحلة</span><select id="singleStageSel">${stages.map(st=>`<option value="${st}">${st}</option>`).join('')}</select></label></div>
+      </div>
+    `;
+    document.getElementById('autoRun').onclick = ()=>{
+      const mode = document.querySelector('input[name="autoMode"]:checked').value;
+      autoAssignByMode(hid, sid, mode);
+      saveAll({withBackup:true});
+      renderSeats(hid, sid);
+      document.getElementById('autoOptions').classList.add('hidden');
+    };
+    document.getElementById('autoClose').onclick = ()=> document.getElementById('autoOptions').classList.add('hidden');
+    document.getElementById('autoOptions').classList.remove('hidden');
+  }
+
+  function autoAssignByMode(hid, sid, mode){
+    if(mode==='mixed'){ autoAssign(hid, sid); return; }
+    const hall = state.data.halls.find(h=>h.id===hid);
+    const sec = hall?.sectors?.find(s=>s.id===sid);
+    const seatList = buildSeatSnake(hid, sid);
+    const cap = sec?.seatCapacity===2?2:1;
+    const students = [...state.data.students];
+    const takeFromStage = (stage)=>{
+      const idx = students.findIndex(s=> (s.stage||'').trim()===stage && !isAssigned(s.id));
+      if(idx<0) return null; const st = students[idx]; students.splice(idx,1); return st;
+    };
+    function isAssigned(id){
+      for(const v of Object.values(state.data.assignments||{})){
+        if(Array.isArray(v)? v.includes(id): v===id) return true;
+      }
+      return false;
+    }
+    if(mode==='pairStages' && cap===2){
+      const a = document.getElementById('pairStageA').value;
+      const b = document.getElementById('pairStageB').value;
+      for(const seat of seatList){
+        const sA = takeFromStage(a); const sB = takeFromStage(b);
+        if(!sA || !sB) break;
+        state.data.assignments[seat.seatId] = [sA.id, sB.id];
+      }
+      return;
+    }
+    if(mode==='rowStage' && cap===1){
+      const map = new Map();
+      (sec.rows||[]).forEach((_,i)=>{ const sel = document.querySelector(`[data-row-stage="${i+1}"]`); if(sel) map.set(i+1, sel.value); });
+      for(const seat of seatList){
+        const stg = map.get(seat.row);
+        const s = takeFromStage(stg);
+        if(!s) continue;
+        state.data.assignments[seat.seatId] = s.id;
+      }
+      return;
+    }
+
+    if(mode==='colStage'){
+      if(cap===1){
+        const colMap = new Map();
+        $$('[data-col-stage]').forEach(el=> colMap.set(+el.getAttribute('data-col-stage'), el.value));
+        for(const seat of seatList){
+          const stg = colMap.get(seat.col);
+          const s = stg? takeFromStage(stg) : null;
+          if(!s) continue;
+          state.data.assignments[seat.seatId] = s.id;
+        }
+      } else {
+        const mapA = new Map();
+        const mapB = new Map();
+        $$('[data-col-stage-a]').forEach(el=> mapA.set(+el.getAttribute('data-col-stage-a'), el.value));
+        $$('[data-col-stage-b]').forEach(el=> mapB.set(+el.getAttribute('data-col-stage-b'), el.value));
+        for(const seat of seatList){
+          let aStage = mapA.get(seat.col);
+          let bStage = mapB.get(seat.col);
+          if(!aStage){ aStage = (mapA.get(1) || uniqueStages()[0] || ''); }
+          if(!bStage || bStage===aStage){
+            const alt = uniqueStages().find(s=> s!==aStage);
+            bStage = alt || aStage;
+          }
+          const sA = aStage? takeFromStage(aStage) : null;
+          const sB = bStage? takeFromStage(bStage) : null;
+          if(sA && sB){
+            state.data.assignments[seat.seatId] = [sA.id, sB.id];
+          } else if(sA){
+            // حاول ملء المقعد الثاني بمرحلة مختلفة عن الأول إذا لم تتوفر مرحلة B
+            const firstStage = sA.stage||'';
+            let sDiff = null;
+            for(let i=0;i<students.length;i++){
+              if(!isAssigned(students[i].id) && (students[i].stage||'')!==firstStage){ sDiff = students.splice(i,1)[0]; break; }
+            }
+            state.data.assignments[seat.seatId] = sDiff? [sA.id, sDiff.id] : [sA.id];
+          }
+        }
+      }
+      return;
+    }
+    if(mode==='singleStage'){
+      const stg = document.getElementById('singleStageSel').value;
+      for(const seat of seatList){
+        if(cap===2){
+          const sA = takeFromStage(stg); const sB = takeFromStage(stg);
+          if(!sA || !sB) break;
+          state.data.assignments[seat.seatId] = [sA.id, sB.id];
+        } else {
+          const s = takeFromStage(stg); if(!s) break; state.data.assignments[seat.seatId] = s.id;
+        }
+      }
+      return;
     }
   }
 
