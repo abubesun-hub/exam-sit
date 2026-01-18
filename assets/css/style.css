@@ -92,6 +92,14 @@ body{
 .seats[data-cols="2"]{grid-template-columns:repeat(2, 1fr)}
 .seats[data-cols="3"]{grid-template-columns:repeat(3, 1fr)}
 .seats[data-cols="4"]{grid-template-columns:repeat(4, 1fr)}
+.line-controls{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:.5rem; margin-bottom:.5rem}
+.line-controls{grid-column:1/-1}
+.line-actions{grid-column:1/-1}
+.line-ctrl{padding:.6rem; border-radius:10px; background: var(--surface); box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light)}
+.line-ctrl .line-label{font-weight:700; margin-bottom:.25rem; color:var(--muted)}
+.line-ctrl.two .line-pair{display:grid; grid-template-columns:1fr 1fr; gap:.4rem}
+.line-actions{margin-bottom:.5rem}
+.line-actions .btn{padding:.5rem .8rem;}
 .seat{padding:.8rem; border-radius:12px; background: var(--surface); box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light); min-width:280px}
 .seat .label{font-size:.78rem; color:var(--muted)}
 .seat .name{font-weight:700; font-size:1rem}

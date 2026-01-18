@@ -169,7 +169,6 @@
           </div>
           <div class="actions mt">
             <button class="btn btn-neo" data-generate="${h.id}:${sec.id}"><i class="bi bi-diagram-3"></i><span>توليد المقاعد</span></button>
-            <button class="btn btn-ghost" data-autoassign="${h.id}:${sec.id}"><i class="bi bi-magic"></i><span>توزيع تلقائي</span></button>
           </div>
           <div class="mt seats" id="seats-${h.id}-${sec.id}" data-cols="${Math.min(4, (sec.rows||[]).length||2)}"></div>
         </div>`
@@ -329,9 +328,23 @@
       }
     });
 
-    host.setAttribute('data-cols', String(Math.min(4, (sec.rows||[]).length||1)));
+    // header controls: stage per vertical line
+    const rows = sec.rows||[];
+    const maxCols = Math.max(...rows.map(r=> r.seats||0));
+    const stages = uniqueStages();
     const capacity = sec.seatCapacity===2?2:1;
-    host.innerHTML = seats.map(seat=>{
+    const lineControls = Array.from({length:maxCols},(_,i)=>{
+      const c = i+1;
+      if(capacity===2){
+        return `<div class="line-ctrl two"><div class="line-label">خط ${c}</div><div class="line-pair"><select class="line-stage-a" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select><select class="line-stage-b" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div></div>`;
+      }
+      return `<div class="line-ctrl"><div class="line-label">خط ${c}</div><select class="line-stage" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>`;
+    }).join('');
+
+    const header = `<div class="line-controls" style="grid-column:1/-1; grid-template-columns:repeat(${maxCols}, 1fr)">${lineControls}</div><div class="line-actions" style="grid-column:1/-1"><button class="btn" id="applyLines-${hid}-${sid}">تطبيق التوزيع حسب الخطوط</button></div>`;
+
+    host.setAttribute('data-cols', String(Math.min(4, (sec.rows||[]).length||1)));
+    host.innerHTML = header + seats.map(seat=>{
       if(capacity===2){
         const [s1,s2] = [seat.students[0], seat.students[1]];
         const st1 = state.data.students.find(x=>x.id===s1);
@@ -385,6 +398,15 @@
         openStudentPicker(hid, sid, el.getAttribute('data-seat'));
       });
     });
+
+    const applyBtn = document.getElementById(`applyLines-${hid}-${sid}`);
+    if(applyBtn){
+      applyBtn.addEventListener('click', ()=>{
+        applyLineDistribution(hid, sid);
+        saveAll();
+        renderSeats(hid, sid);
+      });
+    }
   }
 
   function normalizeSeat(val){
@@ -421,6 +443,72 @@
       }
     });
     return list;
+  }
+
+  function clearSectorAssignments(hid, sid){
+    const list = buildSeatSnake(hid, sid);
+    for(const seat of list){ delete state.data.assignments[seat.seatId]; }
+  }
+
+  function applyLineDistribution(hid, sid){
+    const hall = state.data.halls.find(h=>h.id===hid);
+    const sec = hall?.sectors?.find(s=>s.id===sid);
+    if(!sec) return;
+    const rows = sec.rows||[];
+    const maxCols = Math.max(...rows.map(r=> r.seats||0));
+    const cap = sec.seatCapacity===2?2:1;
+    const students = [...state.data.students];
+    const isAssigned = (id)=>{
+      for(const v of Object.values(state.data.assignments||{})){
+        if(Array.isArray(v)? v.includes(id): v===id) return true;
+      }
+      return false;
+    };
+    const takeFromStage = (stage)=>{
+      const idx = students.findIndex(s=> (s.stage||'').trim()===stage && !isAssigned(s.id));
+      if(idx<0) return null; const st = students[idx]; students.splice(idx,1); return st;
+    };
+    clearSectorAssignments(hid, sid);
+    if(cap===1){
+      for(let c=1;c<=maxCols;c++){
+        const sel = document.querySelector(`#seats-${hid}-${sid} .line-stage[data-col="${c}"]`);
+        const stg = sel?.value; if(!stg) continue;
+        for(let r=1;r<=rows.length;r++){
+          const seatsInRow = rows[r-1]?.seats||0; if(c>seatsInRow) continue;
+          const seatId = `${hid}:${sid}:${r}:${c}`;
+          const s = takeFromStage(stg); if(!s) continue;
+          state.data.assignments[seatId] = s.id;
+        }
+      }
+    } else {
+      for(let c=1;c<=maxCols;c++){
+        const aSel = document.querySelector(`#seats-${hid}-${sid} .line-stage-a[data-col="${c}"]`);
+        const bSel = document.querySelector(`#seats-${hid}-${sid} .line-stage-b[data-col="${c}"]`);
+        let aStage = aSel?.value || '';
+        let bStage = bSel?.value || '';
+        if(!bStage || bStage===aStage){
+          const stages = uniqueStages();
+          const alt = stages.find(s=> s!==aStage);
+          bStage = alt || bStage || aStage;
+        }
+        for(let r=1;r<=rows.length;r++){
+          const seatsInRow = rows[r-1]?.seats||0; if(c>seatsInRow) continue;
+          const seatId = `${hid}:${sid}:${r}:${c}`;
+          const sA = aStage? takeFromStage(aStage) : null;
+          const sB = bStage? takeFromStage(bStage) : null;
+          if(sA && sB){ state.data.assignments[seatId] = [sA.id, sB.id]; }
+          else if(sA){
+            // محاولة ملء الثاني بمرحلة مختلفة عن الأول
+            const firstStage = sA.stage||'';
+            let sDiff = null;
+            for(let i=0;i<students.length;i++){
+              if(!isAssigned(students[i].id) && (students[i].stage||'')!==firstStage){ sDiff = students.splice(i,1)[0]; break; }
+            }
+            state.data.assignments[seatId] = sDiff? [sA.id, sDiff.id] : [sA.id];
+          }
+        }
+      }
+    }
   }
 
   function autoAssign(hid, sid){
@@ -551,6 +639,8 @@
     const hall = state.data.halls.find(h=>h.id===hid);
     const sec = hall?.sectors?.find(s=>s.id===sid);
     const seatList = buildSeatSnake(hid, sid);
+    // نظّف تعيينات هذا القطاع قبل أي توزيع جديد لضمان توافق الفلاتر
+    for(const seat of seatList){ delete state.data.assignments[seat.seatId]; }
     const cap = sec?.seatCapacity===2?2:1;
     const students = [...state.data.students];
     const takeFromStage = (stage)=>{
@@ -589,37 +679,49 @@
       if(cap===1){
         const colMap = new Map();
         $$('[data-col-stage]').forEach(el=> colMap.set(+el.getAttribute('data-col-stage'), el.value));
-        for(const seat of seatList){
-          const stg = colMap.get(seat.col);
-          const s = stg? takeFromStage(stg) : null;
-          if(!s) continue;
-          state.data.assignments[seat.seatId] = s.id;
+        // وزّع حسب الأعمدة عموديًا من الأعلى للأدنى لضمان تطابق تام
+        const rows = sec.rows||[];
+        const maxCols = Math.max(...rows.map(r=> r.seats||0));
+        for(let c=1;c<=maxCols;c++){
+          const stage = colMap.get(c);
+          if(!stage) continue;
+          for(let r=1;r<=rows.length;r++){
+            const seatsInRow = rows[r-1]?.seats||0;
+            if(c>seatsInRow) continue; // لا يوجد مقعد بهذا العمود في هذا الصف
+            const seatId = `${hid}:${sid}:${r}:${c}`;
+            const s = takeFromStage(stage);
+            if(!s) continue; // إذا نفدت المرحلة اتركه فارغًا
+            state.data.assignments[seatId] = s.id;
+          }
         }
       } else {
         const mapA = new Map();
         const mapB = new Map();
         $$('[data-col-stage-a]').forEach(el=> mapA.set(+el.getAttribute('data-col-stage-a'), el.value));
         $$('[data-col-stage-b]').forEach(el=> mapB.set(+el.getAttribute('data-col-stage-b'), el.value));
-        for(const seat of seatList){
-          let aStage = mapA.get(seat.col);
-          let bStage = mapB.get(seat.col);
-          if(!aStage){ aStage = (mapA.get(1) || uniqueStages()[0] || ''); }
-          if(!bStage || bStage===aStage){
-            const alt = uniqueStages().find(s=> s!==aStage);
-            bStage = alt || aStage;
-          }
-          const sA = aStage? takeFromStage(aStage) : null;
-          const sB = bStage? takeFromStage(bStage) : null;
-          if(sA && sB){
-            state.data.assignments[seat.seatId] = [sA.id, sB.id];
-          } else if(sA){
-            // حاول ملء المقعد الثاني بمرحلة مختلفة عن الأول إذا لم تتوفر مرحلة B
-            const firstStage = sA.stage||'';
-            let sDiff = null;
-            for(let i=0;i<students.length;i++){
-              if(!isAssigned(students[i].id) && (students[i].stage||'')!==firstStage){ sDiff = students.splice(i,1)[0]; break; }
+        // توزيع ثنائي حسب العمود عموديًا
+        const rows = sec.rows||[];
+        const maxCols = Math.max(...rows.map(r=> r.seats||0));
+        for(let c=1;c<=maxCols;c++){
+          let aStage = mapA.get(c) || uniqueStages()[0] || '';
+          let bStage = mapB.get(c) || uniqueStages().find(s=> s!==aStage) || aStage;
+          for(let r=1;r<=rows.length;r++){
+            const seatsInRow = rows[r-1]?.seats||0;
+            if(c>seatsInRow) continue;
+            const seatId = `${hid}:${sid}:${r}:${c}`;
+            const sA = aStage? takeFromStage(aStage) : null;
+            const sB = bStage? takeFromStage(bStage) : null;
+            if(sA && sB){
+              state.data.assignments[seatId] = [sA.id, sB.id];
+            } else if(sA){
+              // إذا نفدت مرحلة B، حاول مرحلة مختلفة عن A
+              const firstStage = sA.stage||'';
+              let sDiff = null;
+              for(let i=0;i<students.length;i++){
+                if(!isAssigned(students[i].id) && (students[i].stage||'')!==firstStage){ sDiff = students.splice(i,1)[0]; break; }
+              }
+              state.data.assignments[seatId] = sDiff? [sA.id, sDiff.id] : [sA.id];
             }
-            state.data.assignments[seat.seatId] = sDiff? [sA.id, sDiff.id] : [sA.id];
           }
         }
       }
