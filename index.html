@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>نظام خارطة جلوس الطلبة</title>
+  <meta name="description" content="توزيع مقاعد الطلاب للامتحانات - يعمل محلياً بدون اتصال" />
+  <!-- خطوط (تعمل مع الاتصال – يتراجع للنظام بدون انترنت) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <header class="app-header neo-surface">
+    <div class="container">
+      <h1 class="app-title"><i class="bi bi-grid-3x3-gap"></i> نظام خارطة جلوس الطلبة</h1>
+      <div class="header-actions">
+        <button id="btnPrint" class="btn btn-neo" title="طباعة / PDF"><i class="bi bi-printer"></i><span>طباعة</span></button>
+        <button id="btnBackupNow" class="btn btn-ghost" title="نسخ احتياطي فوري"><i class="bi bi-cloud-arrow-up"></i><span>نسخ احتياطي</span></button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs neo-surface">
+    <div class="container">
+      <button class="tab active" data-target="#dashboard"><i class="bi bi-speedometer2"></i><span>لوحة التحكم</span></button>
+      <button class="tab" data-target="#students"><i class="bi bi-people"></i><span>الطلاب</span></button>
+      <button class="tab" data-target="#halls"><i class="bi bi-building"></i><span>القاعات والقطاعات</span></button>
+      <button class="tab" data-target="#io"><i class="bi bi-arrow-left-right"></i><span>استيراد / تصدير</span></button>
+      <button class="tab" data-target="#settings"><i class="bi bi-gear"></i><span>الإعدادات</span></button>
+    </div>
+  </nav>
+
+  <main class="container app-body">
+    <!-- Dashboard -->
+    <section id="dashboard" class="view active">
+      <div class="grid-3">
+        <div class="card neo">
+          <div class="stat">
+            <div class="stat-icon neo-inset"><i class="bi bi-people"></i></div>
+            <div>
+              <div class="stat-label">عدد الطلاب</div>
+              <div id="statStudents" class="stat-value">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="card neo">
+          <div class="stat">
+            <div class="stat-icon neo-inset"><i class="bi bi-building"></i></div>
+            <div>
+              <div class="stat-label">عدد القاعات</div>
+              <div id="statHalls" class="stat-value">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="card neo">
+          <div class="stat">
+            <div class="stat-icon neo-inset"><i class="bi bi-diagram-3"></i></div>
+            <div>
+              <div class="stat-label">المقاعد المخصصة</div>
+              <div id="statAssigned" class="stat-value">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card neo mt">
+        <h3>آخر النسخ الاحتياطية</h3>
+        <div id="backupList" class="backup-list"></div>
+      </div>
+    </section>
+
+    <!-- Students -->
+    <section id="students" class="view">
+      <div class="card neo">
+        <h3>إضافة طالب</h3>
+        <form id="studentForm" class="form-grid">
+          <label>
+            <span>اسم الطالب</span>
+            <input type="text" id="stName" placeholder="الاسم الثلاثي" required />
+          </label>
+          <label>
+            <span>المرحلة/الصف</span>
+            <input type="text" id="stStage" placeholder="مثال: السادس" />
+          </label>
+          <label>
+            <span>الشعبة</span>
+            <input type="text" id="stClass" placeholder="أ، ب" />
+          </label>
+          <div class="actions">
+            <button class="btn btn-neo" type="submit"><i class="bi bi-plus-circle"></i><span>إضافة</span></button>
+            <button class="btn btn-ghost" type="button" id="btnClearStudents"><i class="bi bi-trash"></i><span>حذف الكل</span></button>
+          </div>
+        </form>
+        <div class="mt io-group">
+          <input type="file" id="fileImportStudentsInline" accept=".csv,.json,.xlsx,.xls" />
+          <button class="btn btn-neo" type="button" id="btnImportStudentsInline"><i class="bi bi-file-earmark-arrow-down"></i><span>استيراد بيانات الطلاب</span></button>
+          <span class="muted">Excel بترتيب الأعمدة: الاسم، المرحلة، الشعبة</span>
+        </div>
+      </div>
+
+      <div class="card neo mt">
+        <div class="list-header">
+          <h3>قائمة الطلاب</h3>
+          <div>
+            <input id="studentSearch" class="input" placeholder="بحث سريع..." />
+          </div>
+        </div>
+        <div id="studentsTable" class="table"></div>
+      </div>
+    </section>
+
+    <!-- Halls & Sectors -->
+    <section id="halls" class="view">
+      <div class="card neo">
+        <h3>إضافة قاعة</h3>
+        <form id="hallForm" class="form-grid">
+          <label>
+            <span>اسم القاعة</span>
+            <input type="text" id="hallName" placeholder="القاعة الأولى" required />
+          </label>
+          <div class="actions">
+            <button class="btn btn-neo" type="submit"><i class="bi bi-plus-circle"></i><span>إضافة قاعة</span></button>
+          </div>
+        </form>
+      </div>
+
+      <div id="hallsList" class="mt"></div>
+    </section>
+
+    <!-- Import / Export -->
+    <section id="io" class="view">
+      <div class="grid-2">
+        <div class="card neo">
+          <h3>استيراد طلاب</h3>
+          <p class="muted">يدعم CSV/JSON محلياً، وExcel إذا توفر الاتصال (SheetJS).</p>
+          <div class="io-group">
+            <input type="file" id="fileImport" accept=".csv,.json,.xlsx,.xls" />
+            <button id="btnImportStudents" class="btn btn-neo"><i class="bi bi-file-earmark-arrow-down"></i><span>استيراد</span></button>
+          </div>
+          <details class="hint">
+            <summary>تنسيق CSV المقترح</summary>
+            <code>الاسم,المرحلة,الشعبة</code>
+          </details>
+        </div>
+        <div class="card neo">
+          <h3>تصدير البيانات</h3>
+          <div class="io-group">
+            <button id="btnExportJSON" class="btn btn-neo"><i class="bi bi-filetype-json"></i><span>كل البيانات JSON</span></button>
+            <button id="btnExportStudentsCSV" class="btn btn-ghost"><i class="bi bi-filetype-csv"></i><span>الطلاب CSV</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="settings" class="view">
+      <div class="card neo">
+        <h3>إعدادات عامة</h3>
+        <div class="form-grid">
+          <label>
+            <span>السمة</span>
+            <select id="themeSelect">
+              <option value="light">فاتح</option>
+              <option value="dark">داكن</option>
+            </select>
+          </label>
+          <label>
+            <span>حدّ أقصى للنسخ الاحتياطية</span>
+            <input type="number" id="backupLimit" min="1" max="50" value="10" />
+          </label>
+          <div class="actions">
+            <button class="btn btn-neo" id="btnSaveSettings"><i class="bi bi-check2-circle"></i><span>حفظ الإعدادات</span></button>
+            <button class="btn btn-ghost" id="btnResetApp"><i class="bi bi-arrow-counterclockwise"></i><span>إرجاع الحالة الافتراضية</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer neo-surface">
+    <div class="container">
+      <span>يعمل محلياً – يدعم RTL – تصميم نيومورفيك</span>
+    </div>
+  </footer>
+
+  <!-- SheetJS للتعامل مع Excel (اختياري عند توفر الإنترنت) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
