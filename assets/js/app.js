@@ -151,7 +151,8 @@
             <button class="btn btn-ghost" data-clear-sector="${h.id}:${sec.id}"><i class="bi bi-eraser"></i><span>تفريغ القطاع</span></button>
           </div>
           <div class="row-config">
-            <label><span>عدد الصفوف (الخطوط)</span><input type="number" min="1" value="${sec.rows?.length||2}" data-sect-rows="${h.id}:${sec.id}" /></label>
+            <label><span>عدد الصفوف</span><input type="number" min="1" value="${sec.rows?.length||2}" data-sect-rows="${h.id}:${sec.id}" /></label>
+            <label><span>عدد الخطوط (الأعمدة) لكل صف</span><input type="number" min="1" value="${Math.max(...((sec.rows||[ {seats:8},{seats:8} ]).map(r=>r.seats)))}" data-sect-cols="${h.id}:${sec.id}" /></label>
             <label><span>مقاعد كل صف (مثال: 8,8,7)</span><input type="text" value="${(sec.rows||[ {seats:8},{seats:8} ]).map(r=>r.seats).join(',')}" data-sect-seats="${h.id}:${sec.id}" placeholder="8,8,8"/></label>
           </div>
           <div class="capacity">
@@ -234,6 +235,19 @@
       });
     });
 
+    // ضبط عدد الخطوط (الأعمدة) بشكل موحّد لكل الصفوف
+    wrap.querySelectorAll('[data-sect-cols]').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        const [hid,sid] = inp.getAttribute('data-sect-cols').split(':');
+        const hall = state.data.halls.find(h=>h.id===hid);
+        const sec = hall?.sectors?.find(s=>s.id===sid);
+        const n = Math.max(1, parseInt(inp.value||'1',10));
+        sec.rows = (sec.rows||[{seats:8},{seats:8}]).map(r=> ({seats:n}));
+        saveAll();
+        renderHalls();
+      });
+    });
+
     wrap.querySelectorAll('[data-seat-capacity]').forEach(sel=>{
       sel.addEventListener('change', ()=>{
         const [hid,sid] = sel.getAttribute('data-seat-capacity').split(':');
@@ -245,15 +259,15 @@
       });
     });
 
+    // قوالب تغيير عدد الخطوط (الأعمدة) لكل الصفوف
     wrap.querySelectorAll('[data-template]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const [hid,sid,nStr] = btn.getAttribute('data-template').split(':');
         const hall = state.data.halls.find(h=>h.id===hid);
         const sec = hall?.sectors?.find(s=>s.id===sid);
         const n = Math.max(1, parseInt(nStr||'2',10));
-        // استخدم القيمة السائدة للمقاعد أو 8 كمبدئي
-        const defaultSeats = (sec.rows&&sec.rows.length)? Math.round(sec.rows.map(r=>r.seats).reduce((a,b)=>a+b,0)/sec.rows.length) : 8;
-        sec.rows = Array.from({length:n}, ()=>({seats: defaultSeats||8}));
+        // غيّر عدد الأعمدة لكل الصفوف إلى n
+        sec.rows = (sec.rows||[{seats:8},{seats:8}]).map(r=> ({seats:n}));
         saveAll();
         renderHalls();
       });
@@ -331,9 +345,10 @@
     // header controls: stage per vertical line
     const rows = sec.rows||[];
     const maxCols = Math.max(...rows.map(r=> r.seats||0));
+    const visibleCols = Math.min(maxCols||1, 4);
     const stages = uniqueStages();
     const capacity = sec.seatCapacity===2?2:1;
-    const lineControls = Array.from({length:maxCols},(_,i)=>{
+    const lineControls = Array.from({length:visibleCols},(_,i)=>{
       const c = i+1;
       if(capacity===2){
         return `<div class="line-ctrl two"><div class="line-label">خط ${c}</div><div class="line-pair"><div class="pair-item"><div class="pair-title">طالب 1 (يمين)</div><select class="line-stage-a" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div><div class="pair-item"><div class="pair-title">طالب 2 (يسار)</div><select class="line-stage-b" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div></div></div>`;
@@ -341,9 +356,10 @@
       return `<div class="line-ctrl"><div class="line-label">خط ${c}</div><select class="line-stage" data-col="${c}">${stages.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>`;
     }).join('');
 
-    const header = `<div class="line-controls" style="grid-column:1/-1; grid-template-columns:repeat(${maxCols}, 1fr)">${lineControls}</div><div class="line-actions" style="grid-column:1/-1"><button class="btn" id="applyLines-${hid}-${sid}">تطبيق التوزيع حسب الخطوط</button></div>`;
+    const header = `<div class="line-controls" style="grid-column:1/-1; grid-template-columns:repeat(${visibleCols}, 1fr)">${lineControls}</div><div class="line-actions" style="grid-column:1/-1"><button class="btn" id="applyLines-${hid}-${sid}">تطبيق التوزيع حسب الخطوط</button></div>`;
 
-    host.setAttribute('data-cols', String(Math.min(4, (sec.rows||[]).length||1)));
+    // عدد الأعمدة المرئية يساوي أكبر عدد مقاعد في أي خط
+    host.setAttribute('data-cols', String(visibleCols));
     host.innerHTML = header + seats.map(seat=>{
       if(capacity===2){
         const [s1,s2] = [seat.students[0], seat.students[1]];
@@ -456,6 +472,7 @@
     if(!sec) return;
     const rows = sec.rows||[];
     const maxCols = Math.max(...rows.map(r=> r.seats||0));
+    const visibleCols = Math.min(maxCols||1, 4);
     const cap = sec.seatCapacity===2?2:1;
     const students = [...state.data.students];
     const isAssigned = (id)=>{
@@ -470,7 +487,7 @@
     };
     clearSectorAssignments(hid, sid);
     if(cap===1){
-      for(let c=1;c<=maxCols;c++){
+      for(let c=1;c<=visibleCols;c++){
         const sel = document.querySelector(`#seats-${hid}-${sid} .line-stage[data-col="${c}"]`);
         const stg = sel?.value; if(!stg) continue;
         for(let r=1;r<=rows.length;r++){
@@ -481,7 +498,7 @@
         }
       }
     } else {
-      for(let c=1;c<=maxCols;c++){
+      for(let c=1;c<=visibleCols;c++){
         const aSel = document.querySelector(`#seats-${hid}-${sid} .line-stage-a[data-col="${c}"]`);
         const bSel = document.querySelector(`#seats-${hid}-${sid} .line-stage-b[data-col="${c}"]`);
         const aStage = aSel?.value || '';
