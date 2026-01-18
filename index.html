@@ -189,6 +189,25 @@
     </div>
   </footer>
 
+  <!-- نافذة اختيار الطلاب للمقعد -->
+  <div id="studentPicker" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel neo">
+      <div class="modal-header">
+        <h3 id="pickerTitle">اختيار طالب للمقعد</h3>
+        <button class="btn btn-ghost" id="pickerClose"><i class="bi bi-x"></i></button>
+      </div>
+      <div class="modal-tools">
+        <input id="pickerSearch" class="input" placeholder="بحث بالاسم أو المرحلة أو الشعبة" />
+      </div>
+      <div id="pickerGroups" class="picker-groups"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="pickerClearSeat"><i class="bi bi-trash"></i><span>تفريغ المقعد</span></button>
+        <button class="btn btn-neo" id="pickerDone"><i class="bi bi-check2"></i><span>تم</span></button>
+      </div>
+    </div>
+  </div>
+
   <!-- SheetJS للتعامل مع Excel (اختياري عند توفر الإنترنت) -->
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="assets/js/storage.js"></script>

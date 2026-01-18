@@ -12,6 +12,7 @@
   const uid = () => Math.random().toString(36).slice(2,9);
   const fmt = n => new Intl.NumberFormat('ar-IQ').format(n);
   let dragFromSeat = null;
+  let picker = { seatId:null, hid:null, sid:null, capacity:1 };
 
   function saveAll({withBackup=false}={}){
     StorageAPI.save(state.data);
@@ -144,9 +145,21 @@
       const sectors = (h.sectors||[]).map(sec=>
         `<div class="sector neo">
           <h4>القطاع ${sec.name}</h4>
+          <div class="actions" style="margin-bottom:.5rem">
+            <button class="btn btn-ghost" data-edit-sector="${h.id}:${sec.id}"><i class="bi bi-pencil"></i><span>تعديل اسم القطاع</span></button>
+            <button class="btn btn-ghost" data-del-sector="${h.id}:${sec.id}"><i class="bi bi-trash"></i><span>حذف القطاع</span></button>
+          </div>
           <div class="row-config">
             <label><span>عدد الصفوف (الخطوط)</span><input type="number" min="1" value="${sec.rows?.length||2}" data-sect-rows="${h.id}:${sec.id}" /></label>
             <label><span>مقاعد كل صف (مثال: 8,8,7)</span><input type="text" value="${(sec.rows||[ {seats:8},{seats:8} ]).map(r=>r.seats).join(',')}" data-sect-seats="${h.id}:${sec.id}" placeholder="8,8,8"/></label>
+          </div>
+          <div class="capacity">
+            <label><span>سعة المقعد</span>
+              <select data-seat-capacity="${h.id}:${sec.id}">
+                <option value="1" ${sec.seatCapacity==2? '' : 'selected'}>طالب واحد</option>
+                <option value="2" ${sec.seatCapacity==2? 'selected' : ''}>طالبان</option>
+              </select>
+            </label>
           </div>
           <div class="templates">
             <button class="btn btn-ghost" data-template="${h.id}:${sec.id}:2"><i class="bi bi-layout-three-columns"></i><span>قالب 2 خطوط</span></button>
@@ -221,6 +234,17 @@
       });
     });
 
+    wrap.querySelectorAll('[data-seat-capacity]').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
+        const [hid,sid] = sel.getAttribute('data-seat-capacity').split(':');
+        const hall = state.data.halls.find(h=>h.id===hid);
+        const sec = hall?.sectors?.find(s=>s.id===sid);
+        sec.seatCapacity = parseInt(sel.value,10)===2?2:1;
+        saveAll();
+        renderHalls();
+      });
+    });
+
     wrap.querySelectorAll('[data-template]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const [hid,sid,nStr] = btn.getAttribute('data-template').split(':');
@@ -231,6 +255,32 @@
         const defaultSeats = (sec.rows&&sec.rows.length)? Math.round(sec.rows.map(r=>r.seats).reduce((a,b)=>a+b,0)/sec.rows.length) : 8;
         sec.rows = Array.from({length:n}, ()=>({seats: defaultSeats||8}));
         saveAll();
+        renderHalls();
+      });
+    });
+
+    wrap.querySelectorAll('[data-edit-sector]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const [hid,sid] = btn.getAttribute('data-edit-sector').split(':');
+        const hall = state.data.halls.find(h=>h.id===hid);
+        const sec = hall?.sectors?.find(s=>s.id===sid);
+        const name = prompt('اسم القطاع الجديد', sec.name);
+        if(!name) return;
+        sec.name = String(name);
+        saveAll();
+        renderHalls();
+      });
+    });
+
+    wrap.querySelectorAll('[data-del-sector]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const [hid,sid] = btn.getAttribute('data-del-sector').split(':');
+        const hall = state.data.halls.find(h=>h.id===hid);
+        if(!confirm('حذف القطاع؟')) return;
+        hall.sectors = (hall.sectors||[]).filter(s=>s.id!==sid);
+        // إزالة التعيينات المرتبطة بهذا القطاع
+        Object.keys(state.data.assignments||{}).forEach(k=>{ if(k.startsWith(`${hid}:${sid}:`)) delete state.data.assignments[k]; });
+        saveAll({withBackup:true});
         renderHalls();
       });
     });
@@ -266,18 +316,32 @@
     (sec.rows||[]).forEach((r,rowIndex)=>{
       for(let i=0;i<r.seats;i++){
         const seatId = `${hid}:${sid}:${rowIndex+1}:${i+1}`;
-        seats.push({seatId, row:rowIndex+1, col:i+1, label:`صف ${rowIndex+1} - مقعد ${i+1}`, studentId: state.data.assignments[seatId]});
+        seats.push({seatId, row:rowIndex+1, col:i+1, label:`صف ${rowIndex+1} - مقعد ${i+1}`, students: normalizeSeat(state.data.assignments[seatId])});
       }
     });
 
     host.setAttribute('data-cols', String(Math.min(4, (sec.rows||[]).length||1)));
+    const capacity = sec.seatCapacity===2?2:1;
     host.innerHTML = seats.map(seat=>{
-      const st = state.data.students.find(x=>x.id===seat.studentId);
-      const name = st? `${st.name} <span class=\"badge\">${st.className||''}</span>` : '<span class="muted">فارغ</span>';
-      return `<div class="seat" draggable="true" data-seat="${seat.seatId}">
-        <div class="label">${seat.label}</div>
-        <div class="name">${name}</div>
-      </div>`;
+      if(capacity===2){
+        const [s1,s2] = [seat.students[0], seat.students[1]];
+        const st1 = state.data.students.find(x=>x.id===s1);
+        const st2 = state.data.students.find(x=>x.id===s2);
+        const n1 = st1? `${st1.name} <span class=\"badge\">${st1.className||''}</span>` : '<span class="muted">فارغ</span>';
+        const n2 = st2? `${st2.name} <span class=\"badge\">${st2.className||''}</span>` : '<span class="muted">فارغ</span>';
+        return `<div class="seat two" draggable="true" data-seat="${seat.seatId}">
+          <div class="label">${seat.label}</div>
+          <div class="names"><div class="slot">${n1}</div><div class="slot">${n2}</div></div>
+        </div>`;
+      } else {
+        const s = seat.students[0];
+        const st = state.data.students.find(x=>x.id===s);
+        const name = st? `${st.name} <span class=\"badge\">${st.className||''}</span>` : '<span class="muted">فارغ</span>';
+        return `<div class="seat" draggable="true" data-seat="${seat.seatId}">
+          <div class="label">${seat.label}</div>
+          <div class="name">${name}</div>
+        </div>`;
+      }
     }).join('');
 
     // Wire drag & drop
@@ -294,17 +358,38 @@
         const targetSeat = el.getAttribute('data-seat');
         const sourceSeat = dragFromSeat || e.dataTransfer.getData('text/plain');
         if(!sourceSeat || sourceSeat===targetSeat) return;
-        const a = state.data.assignments[sourceSeat] || null;
-        const b = state.data.assignments[targetSeat] || null;
-        if(a==null && b==null) return;
-        state.data.assignments[sourceSeat] = b || undefined;
+        const a = normalizeSeat(state.data.assignments[sourceSeat]);
+        const b = normalizeSeat(state.data.assignments[targetSeat]);
+        if(a.length===0 && b.length===0) return;
+        state.data.assignments[sourceSeat] = b.length? b : undefined;
         if(state.data.assignments[sourceSeat]===undefined) delete state.data.assignments[sourceSeat];
-        state.data.assignments[targetSeat] = a || undefined;
+        state.data.assignments[targetSeat] = a.length? a : undefined;
         if(state.data.assignments[targetSeat]===undefined) delete state.data.assignments[targetSeat];
         saveAll();
         renderSeats(hid, sid);
       });
+      el.addEventListener('click', ()=>{
+        openStudentPicker(hid, sid, el.getAttribute('data-seat'));
+      });
     });
+  }
+
+  function normalizeSeat(val){
+    if(!val) return [];
+    if(Array.isArray(val)) return val.filter(Boolean);
+    return [val];
+  }
+
+  function removeStudentFromAssignments(studentId){
+    const keys = Object.keys(state.data.assignments||{});
+    for(const k of keys){
+      const arr = normalizeSeat(state.data.assignments[k]);
+      const idx = arr.indexOf(studentId);
+      if(idx>=0){
+        arr.splice(idx,1);
+        if(arr.length) state.data.assignments[k] = arr; else delete state.data.assignments[k];
+      }
+    }
   }
 
   // Build snake order list of seats (row-wise)
@@ -331,7 +416,10 @@
     if(!sec) return;
 
     // collect unassigned students and group by class
-    const assignedIds = new Set(Object.values(state.data.assignments||{}));
+    const assignedIds = new Set();
+    for(const v of Object.values(state.data.assignments||{})){
+      if(Array.isArray(v)) v.forEach(id=>assignedIds.add(id)); else assignedIds.add(v);
+    }
     const pool = state.data.students.filter(s=>!assignedIds.has(s.id));
     if(!pool.length) return;
 
@@ -343,12 +431,12 @@
     }
 
     const seatList = buildSeatSnake(hid, sid);
-    const classAtPos = new Map(); // key "r,c" -> class
+    const classAtPos = new Map(); // key "r,c" -> set of classes
 
     function getNeighborsClasses(r,c){
       const res = [];
-      const left = `${r},${c-1}`; if(classAtPos.has(left)) res.push(classAtPos.get(left));
-      const up = `${r-1},${c}`; if(classAtPos.has(up)) res.push(classAtPos.get(up));
+      const left = `${r},${c-1}`; if(classAtPos.has(left)) res.push(...classAtPos.get(left));
+      const up = `${r-1},${c}`; if(classAtPos.has(up)) res.push(...classAtPos.get(up));
       return res.filter(Boolean);
     }
 
@@ -359,20 +447,27 @@
       for(const [cls, arr] of entries){
         if(cls && !avoid.includes(cls)) return cls;
       }
-      // try empty class
-      const empty = entries.find(([cls,arr])=> cls==='' && arr.length>0);
+      const empty = entries.find(([cls,arr])=> cls===''
+        && arr.length>0);
       if(empty && !avoid.includes('')) return '';
-      // fall back to largest
       return entries.length? entries[0][0] : null;
     }
 
+    const capacity = sec.seatCapacity===2?2:1;
     for(const seat of seatList){
-      const avoid = getNeighborsClasses(seat.row, seat.col);
-      const cls = pickClass(avoid);
-      if(cls==null) break;
-      const st = groups.get(cls).pop();
-      state.data.assignments[seat.seatId] = st.id;
-      classAtPos.set(`${seat.row},${seat.col}`, cls);
+      const avoidBase = getNeighborsClasses(seat.row, seat.col);
+      const seatClasses = new Set();
+      const arr = [];
+      for(let slot=0; slot<capacity; slot++){
+        const avoid = [...avoidBase, ...seatClasses];
+        const cls = pickClass(avoid);
+        if(cls==null) break;
+        const st = groups.get(cls).pop();
+        arr.push(st.id);
+        seatClasses.add(cls);
+      }
+      if(arr.length) state.data.assignments[seat.seatId] = arr;
+      classAtPos.set(`${seat.row},${seat.col}`, Array.from(seatClasses));
     }
   }
 
@@ -387,7 +482,7 @@
       renderHalls();
     });
   }
-
+  
   // ==== IO (Import/Export) ====
   function toCSV(rows){
     const esc = v => (v==null? '' : String(v).replaceAll('"','""'));
@@ -416,7 +511,6 @@
   function importStudentsFromCSV(text){
     const lines = text.split(/\r?\n/).filter(Boolean);
     if(!lines.length) return 0;
-    // try to detect header
     const header = lines[0].split(',').map(s=>s.replace(/["\uFEFF]/g,'').trim());
     const hasHeader = header.some(h=>['الاسم','اسم','name'].includes(h));
     const start = hasHeader? 1 : 0;
@@ -495,6 +589,61 @@
     });
   }
 
+  // ===== Student Picker Modal =====
+  function openStudentPicker(hid, sid, seatId){
+    const hall = state.data.halls.find(h=>h.id===hid);
+    const sec = hall?.sectors?.find(s=>s.id===sid);
+    picker = { hid, sid, seatId, capacity: sec?.seatCapacity===2?2:1 };
+    $('#pickerTitle').textContent = `اختيار طالب لـ ${seatId}`;
+    $('#pickerSearch').value = '';
+    buildPickerGroups('');
+    $('#studentPicker').classList.remove('hidden');
+  }
+
+  function buildPickerGroups(query){
+    const host = $('#pickerGroups');
+    const q = (query||'').trim();
+    const students = state.data.students.filter(s=>{
+      const text = `${s.name} ${s.stage||''} ${s.className||''}`;
+      return !q || text.includes(q);
+    });
+    const byStage = new Map();
+    for(const s of students){
+      const stg = (s.stage||'غير محدد').trim();
+      if(!byStage.has(stg)) byStage.set(stg, []);
+      byStage.get(stg).push(s);
+    }
+    host.innerHTML = Array.from(byStage.entries()).map(([stage, list])=>{
+      const items = list.map(s=> `<div class=\"picker-item\" data-pick=\"${s.id}\">${s.name} <span class=\"badge\">${s.className||''}</span></div>`).join('');
+      return `<div class=\"picker-group\"><h4>${stage}</h4><div class=\"picker-list\">${items}</div></div>`;
+    }).join('');
+    host.querySelectorAll('[data-pick]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const sid = el.getAttribute('data-pick');
+        const arr = normalizeSeat(state.data.assignments[picker.seatId]);
+        if(arr.length>=picker.capacity){ alert('المقعد ممتلئ'); return; }
+        removeStudentFromAssignments(sid);
+        arr.push(sid);
+        state.data.assignments[picker.seatId] = arr;
+        saveAll();
+        renderSeats(picker.hid, picker.sid);
+      });
+    });
+  }
+
+  function initPicker(){
+    $('#pickerClose').addEventListener('click', ()=> $('#studentPicker').classList.add('hidden'));
+    $('#pickerDone').addEventListener('click', ()=> $('#studentPicker').classList.add('hidden'));
+    $('#pickerClearSeat').addEventListener('click', ()=>{
+      if(!picker.seatId) return;
+      delete state.data.assignments[picker.seatId];
+      saveAll();
+      renderSeats(picker.hid, picker.sid);
+    });
+    $('#pickerSearch').addEventListener('input', (e)=> buildPickerGroups(e.target.value));
+  }
+  
+
   // ==== Settings & Print ====
   function initSettings(){
     $('#themeSelect').value = state.settings.theme;
@@ -534,6 +683,7 @@
     initHalls();
     initIO();
     initSettings();
+    initPicker();
     renderStudents();
     renderHalls();
     refreshStats();

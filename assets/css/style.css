@@ -84,6 +84,8 @@ body{
 /* quick templates */
 .templates{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.5rem}
 .templates .btn{padding:.45rem .75rem}
+/* seat capacity selector inline */
+.capacity{margin-top:.5rem}
 
 /* Seating Grid */
 .seats{display:grid; gap:.35rem}
@@ -93,6 +95,9 @@ body{
 .seat{padding:.5rem; border-radius:10px; background: var(--surface); box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light)}
 .seat .label{font-size:.78rem; color:var(--muted)}
 .seat .name{font-weight:600}
+/* two occupants layout */
+.seat.two .names{display:flex; gap:.5rem; align-items:center; justify-content:space-between}
+.seat.two .names .slot{flex:1; text-align:center}
 /* drag & drop visuals */
 .seat{cursor:grab; user-select:none}
 .seat:active{cursor:grabbing}
@@ -123,3 +128,18 @@ body{
   .seat{border:1px solid #ccc; box-shadow:none}
   .sector{break-inside:avoid}
 }
+
+/* Modal */
+.modal.hidden{display:none}
+.modal{position:fixed; inset:0; z-index:100}
+.modal-backdrop{position:absolute; inset:0; background:rgba(0,0,0,.35)}
+.modal-panel{position:relative; margin:4vh auto; width:min(900px, 94%); padding:1rem}
+.modal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem}
+.modal-tools{display:flex; gap:.5rem; margin-bottom:.5rem}
+.picker-groups{max-height:60vh; overflow:auto}
+.picker-group{margin-bottom:.75rem}
+.picker-group h4{margin:.25rem 0 .5rem; color:var(--muted)}
+.picker-list{display:grid; grid-template-columns:repeat(2,1fr); gap:.4rem}
+.picker-item{padding:.5rem; border-radius:10px; background:var(--surface); box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light); cursor:pointer}
+.picker-item:hover{filter:brightness(1.02)}
+.modal-footer{display:flex; gap:.5rem; justify-content:flex-end; margin-top:.75rem}

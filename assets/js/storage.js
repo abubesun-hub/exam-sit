@@ -18,8 +18,36 @@
     }
   }
 
+  function getBackups(){
+    try{ return JSON.parse(localStorage.getItem(KEYS.BACKUPS)||'[]'); }catch{ return []; }
+  }
+
+  function setBackups(list){
+    localStorage.setItem(KEYS.BACKUPS, JSON.stringify(list||[]));
+  }
+
+  function pruneBackups(){
+    // Trim backups aggressively to free space
+    const list = getBackups();
+    if(list.length<=1) return;
+    const keep = Math.ceil(list.length/2);
+    setBackups(list.slice(0, keep));
+  }
+
   function save(data){
-    localStorage.setItem(KEYS.DATA, JSON.stringify(data));
+    const payload = JSON.stringify(data);
+    try{
+      localStorage.setItem(KEYS.DATA, payload);
+    }catch(e){
+      console.warn('quota exceeded on DATA, pruning backups...', e);
+      try{
+        pruneBackups();
+        localStorage.setItem(KEYS.DATA, payload);
+      }catch(err){
+        alert('فشل الاستيراد: مساحة التخزين المحلية ممتلئة. تم تقليص النسخ الاحتياطية تلقائياً، إن استمر الخطأ يرجى تصدير البيانات ثم تقليل الحجم (مثلاً عدد النسخ الاحتياطية).');
+        throw err;
+      }
+    }
   }
 
   function loadSettings(){
@@ -32,15 +60,24 @@
     localStorage.setItem(KEYS.SETTINGS, JSON.stringify(s||{}));
   }
 
-  function getBackups(){
-    try{ return JSON.parse(localStorage.getItem(KEYS.BACKUPS)||'[]'); }catch{ return []; }
-  }
-
   function addBackup(snapshot, limit){
-    const list = getBackups();
-    list.unshift({ts: nowISO(), snapshot});
-    while(list.length > (limit||10)) list.pop();
-    localStorage.setItem(KEYS.BACKUPS, JSON.stringify(list));
+    try{
+      const list = getBackups();
+      list.unshift({ts: nowISO(), snapshot});
+      while(list.length > (limit||10)) list.pop();
+      setBackups(list);
+    }catch(e){
+      // If quota hit on backups, prune and retry once
+      try{
+        pruneBackups();
+        const list = getBackups();
+        list.unshift({ts: nowISO(), snapshot});
+        while(list.length > (limit||10)) list.pop();
+        setBackups(list);
+      }catch(err){
+        console.warn('backup skipped due to quota');
+      }
+    }
   }
 
   window.StorageAPI = { KEYS, load, save, loadSettings, saveSettings, getBackups, addBackup };
