@@ -152,7 +152,6 @@
           </div>
           <div class="row-config">
             <label><span>عدد الخطوط (الأعمدة) لكل صف</span><input type="number" min="1" value="${rowsToColHeights(sec.rows||[ {seats:8},{seats:8} ]).length}" data-sect-cols="${h.id}:${sec.id}" /></label>
-            <label><span>مقاعد ضمن عمود (مثال: 6,6,5)</span><input type="text" value="${rowsToColHeights(sec.rows||[ {seats:8},{seats:8} ]).join(',')}" data-sect-seats="${h.id}:${sec.id}" placeholder="6,6,5"/></label>
           </div>
           <div class="capacity">
             <label><span>سعة المقعد</span>
@@ -170,7 +169,7 @@
           <div class="actions mt">
             <button class="btn btn-neo" data-generate="${h.id}:${sec.id}"><i class="bi bi-diagram-3"></i><span>توليد المقاعد</span></button>
           </div>
-          <div class="mt seats" id="seats-${h.id}-${sec.id}" data-cols="${Math.min(4, (sec.rows||[]).length||2)}"></div>
+          <div class="mt seats" id="seats-${h.id}-${sec.id}" data-cols="${Math.min(4, Math.max(...(sec.rows||[]).map(r=> r.seats||0), 1))}"></div>
         </div>`
       ).join('');
 
@@ -209,26 +208,7 @@
         renderHalls();
       });
     });
-
-    // أُلغي التحكم بعدد الصفوف؛ عدد الصفوف يتحدد من مدخل "مقاعد كل صف"
-
-    wrap.querySelectorAll('[data-sect-seats]').forEach(inp=>{
-      inp.addEventListener('change', ()=>{
-        const [hid,sid] = inp.getAttribute('data-sect-seats').split(':');
-        const hall = state.data.halls.find(h=>h.id===hid);
-        const sec = hall?.sectors?.find(s=>s.id===sid);
-        const colsHeights = (inp.value||'').split(',').map(s=>parseInt(s.trim(),10)).filter(n=>Number.isFinite(n)&&n>0);
-        if(!colsHeights.length){ alert('صيغة غير صحيحة. مثال: 6,6,5'); return; }
-        const maxRows = Math.max(...colsHeights);
-        const rows = Array.from({length:maxRows}, (_,rowIdx)=>{
-          const seatsInThisRow = colsHeights.filter(h=> h >= (rowIdx+1)).length; // عدد الأعمدة التي تمتد لهذا الصف
-          return {seats: seatsInThisRow};
-        });
-        sec.rows = rows;
-        saveAll();
-        renderHalls();
-      });
-    });
+    // تم إخفاء الحقل القديم "مقاعد ضمن عمود" والاكتفاء بمتحكمات الأعمدة أعلى المقاعد
 
     // ضبط عدد الخطوط (الأعمدة) بشكل موحّد لكل الصفوف
     wrap.querySelectorAll('[data-sect-cols]').forEach(inp=>{
@@ -327,20 +307,13 @@
     const sec = hall?.sectors?.find(s=>s.id===sid);
     const host = document.getElementById(`seats-${hid}-${sid}`);
     if(!sec || !host) return;
-
-    // build seat boxes per row
-    const seats = [];
-    (sec.rows||[]).forEach((r,rowIndex)=>{
-      for(let i=0;i<r.seats;i++){
-        const seatId = `${hid}:${sid}:${rowIndex+1}:${i+1}`;
-        seats.push({seatId, row:rowIndex+1, col:i+1, label:`صف ${rowIndex+1} - مقعد ${i+1}`, students: normalizeSeat(state.data.assignments[seatId])});
-      }
-    });
+    // سنبني المقاعد عموديًا بحسب الأعمدة (الخطوط)
 
     // header controls: stage per vertical line
     const rows = sec.rows||[];
     const maxCols = Math.max(...rows.map(r=> r.seats||0));
     const visibleCols = Math.min(maxCols||1, 4);
+    const colHeights = rowsToColHeights(rows);
     const stages = uniqueStages();
     const capacity = sec.seatCapacity===2?2:1;
     const storedSingle = sec?.colStages || [];
@@ -348,43 +321,54 @@
     const storedB = sec?.colStagesB || [];
     const lineControls = Array.from({length:visibleCols},(_,i)=>{
       const c = i+1;
+      const hVal = colHeights[i]||rows.length||1;
       if(capacity===2){
         const selA = storedA[i]||''; const selB = storedB[i]||'';
-        return `<div class="line-ctrl two"><div class="line-label">خط ${c}</div><div class="line-pair"><div class="pair-item"><div class="pair-title">طالب 1 (يمين)</div><select class="line-stage-a" data-col="${c}">${stages.map(s=>`<option value="${s}" ${selA===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="pair-item"><div class="pair-title">طالب 2 (يسار)</div><select class="line-stage-b" data-col="${c}">${stages.map(s=>`<option value="${s}" ${selB===s?'selected':''}>${s}</option>`).join('')}</select></div></div></div>`;
+        return `<div class="line-ctrl two"><div class="line-label">خط ${c}</div><div class="line-pair"><div class="pair-item"><div class="pair-title">طالب 1 (يمين)</div><select class="line-stage-a" data-col="${c}">${stages.map(s=>`<option value="${s}" ${selA===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="pair-item"><div class="pair-title">طالب 2 (يسار)</div><select class="line-stage-b" data-col="${c}">${stages.map(s=>`<option value="${s}" ${selB===s?'selected':''}>${s}</option>`).join('')}</select></div></div><label class="col-height-label"><span>مقاعد ضمن عمود</span><input type="number" min="1" class="col-height" data-col="${c}" value="${hVal}" /></label></div>`;
       }
       const sel = storedSingle[i]||'';
-      return `<div class="line-ctrl"><div class="line-label">خط ${c}</div><select class="line-stage" data-col="${c}">${stages.map(s=>`<option value="${s}" ${sel===s?'selected':''}>${s}</option>`).join('')}</select></div>`;
+      return `<div class="line-ctrl"><div class="line-label">خط ${c}</div><select class="line-stage" data-col="${c}">${stages.map(s=>`<option value="${s}" ${sel===s?'selected':''}>${s}</option>`).join('')}</select><label class="col-height-label"><span>مقاعد ضمن عمود</span><input type="number" min="1" class="col-height" data-col="${c}" value="${hVal}" /></label></div>`;
     }).join('');
 
     const header = `<div class="line-controls" style="grid-column:1/-1; grid-template-columns:repeat(${visibleCols}, 1fr)">${lineControls}</div><div class="line-actions" style="grid-column:1/-1"><button class="btn" id="applyLines-${hid}-${sid}">تطبيق التوزيع حسب الخطوط</button></div>`;
 
     // عدد الأعمدة المرئية يساوي أكبر عدد مقاعد في أي خط
     host.setAttribute('data-cols', String(visibleCols));
-    host.innerHTML = header + seats.map(seat=>{
-      if(capacity===2){
-        const [s1,s2] = [seat.students[0], seat.students[1]];
-        const st1 = state.data.students.find(x=>x.id===s1);
-        const st2 = state.data.students.find(x=>x.id===s2);
-        const n1 = st1? `${st1.name}` : '<span class=\"muted\">فارغ</span>';
-        const n2 = st2? `${st2.name}` : '<span class=\"muted\">فارغ</span>';
-        return `<div class="seat two" draggable="true" data-seat="${seat.seatId}">
-          <div class="label">${seat.label}</div>
-          <div class="names">
-            <div class="slot"><div class="name">${n1}</div><div class="meta">${st1? `${st1.stage||''} ${st1.className||''}`:''}</div></div>
-            <div class="slot"><div class="name">${n2}</div><div class="meta">${st2? `${st2.stage||''} ${st2.className||''}`:''}</div></div>
-          </div>
-        </div>`;
-      } else {
-        const s = seat.students[0];
-        const st = state.data.students.find(x=>x.id===s);
-        const name = st? `${st.name}` : '<span class=\"muted\">فارغ</span>';
-        return `<div class="seat" draggable="true" data-seat="${seat.seatId}">
-          <div class="label">${seat.label}</div>
-          <div class="name">${name}</div>
-          <div class="meta">${st? `${st.stage||''} ${st.className||''}`:''}</div>
-        </div>`;
-      }
+    const columnsHTML = Array.from({length:visibleCols}, (_,i)=>{
+      const c = i+1;
+      const h = colHeights[i]||0;
+      const seatsInCol = Array.from({length:h}, (_,ri)=>{
+        const r = ri+1;
+        const seatId = `${hid}:${sid}:${r}:${c}`;
+        const assigned = normalizeSeat(state.data.assignments[seatId]);
+        if(capacity===2){
+          const [s1,s2] = [assigned[0], assigned[1]];
+          const st1 = state.data.students.find(x=>x.id===s1);
+          const st2 = state.data.students.find(x=>x.id===s2);
+          const n1 = st1? `${st1.name}` : '<span class="muted">فارغ</span>';
+          const n2 = st2? `${st2.name}` : '<span class="muted">فارغ</span>';
+          return `<div class="seat two" draggable="true" data-seat="${seatId}">
+            <div class="label">خط ${c} - صف ${r}</div>
+            <div class="names">
+              <div class="slot"><div class="name">${n1}</div><div class="meta">${st1? `${st1.stage||''} ${st1.className||''}`:''}</div></div>
+              <div class="slot"><div class="name">${n2}</div><div class="meta">${st2? `${st2.stage||''} ${st2.className||''}`:''}</div></div>
+            </div>
+          </div>`;
+        } else {
+          const s = assigned[0];
+          const st = state.data.students.find(x=>x.id===s);
+          const name = st? `${st.name}` : '<span class="muted">فارغ</span>';
+          return `<div class="seat" draggable="true" data-seat="${seatId}">
+            <div class="label">خط ${c} - صف ${r}</div>
+            <div class="name">${name}</div>
+            <div class="meta">${st? `${st.stage||''} ${st.className||''}`:''}</div>
+          </div>`;
+        }
+      }).join('');
+      return `<div class="col">${seatsInCol}</div>`;
     }).join('');
+
+    host.innerHTML = header + columnsHTML;
 
     // Wire drag & drop
     host.querySelectorAll('.seat').forEach(el=>{
@@ -423,6 +407,22 @@
         renderSeats(hid, sid);
       });
     }
+
+    // Wire per-column height changes
+    host.querySelectorAll('.col-height').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        // Read heights from all visible inputs to avoid leftover hidden columns
+        const heights = Array.from(host.querySelectorAll('.col-height')).map(el=> Math.max(1, parseInt(el.value||'1',10)));
+        const maxRows = Math.max(...heights, 1);
+        const newRows = Array.from({length:maxRows}, (_,rowIdx)=>{
+          const seatsInThisRow = heights.filter(h=> h >= (rowIdx+1)).length;
+          return {seats: seatsInThisRow};
+        });
+        sec.rows = newRows;
+        saveAll();
+        renderHalls();
+      });
+    });
   }
 
   function normalizeSeat(val){
