@@ -845,11 +845,57 @@
   }
 
   function exportJSON(){
+    // legacy: export data only
     const blob = new Blob([JSON.stringify(state.data, null, 2)], {type:'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'exam-seating-data.json';
     a.click();
+  }
+
+  function buildFullPackage(){
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: state.data,
+      settings: state.settings
+    };
+    return payload;
+  }
+
+  function exportFull(){
+    const pkg = buildFullPackage();
+    const blob = new Blob([JSON.stringify(pkg, null, 2)], {type:'application/json'});
+    const ts = new Date().toISOString().replace(/[:T]/g,'-').slice(0,19);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `exam-seating-backup-${ts}.json`;
+    a.click();
+  }
+
+  async function saveAsFull(){
+    const pkg = buildFullPackage();
+    const ts = new Date().toISOString().replace(/[:T]/g,'-').slice(0,19);
+    const suggested = `exam-seating-backup-${ts}.json`;
+    try{
+      if(window.showSaveFilePicker){
+        const handle = await window.showSaveFilePicker({
+          suggestedName: suggested,
+          types: [{ description: 'JSON Backup', accept: { 'application/json': ['.json'] } }]
+        });
+        const stream = await handle.createWritable();
+        await stream.write(new Blob([JSON.stringify(pkg, null, 2)], {type:'application/json'}));
+        await stream.close();
+        toast('تم الحفظ باسم بنجاح');
+      }else{
+        exportFull(); // fallback to download
+      }
+    }catch(e){
+      if(e && e.name==='AbortError'){ return; }
+      console.error(e);
+      alert('تعذر الحفظ باسم. تمت إعادة المحاولة كتنزيل عادي.');
+      exportFull();
+    }
   }
 
   function exportStudentsCSV(){
@@ -906,16 +952,28 @@
     let count = 0;
     if(file.name.endsWith('.json')){
       const obj = JSON.parse(await file.text());
+      // ثلاثة أشكال: {students:[...] } فقط، أو هيكل data فقط، أو حزمة كاملة {data, settings}
       if(Array.isArray(obj.students)){
         state.data.students.push(...obj.students.map(s=> ({id: uid(), name:s.name, stage:s.stage, className:s.className})));
         count = obj.students.length;
+      } else if(obj && obj.data && (obj.settings!==undefined)){
+        state.data = obj.data || {students:[], halls:[], assignments:{}};
+        // دمج الإعدادات مع الحفاظ على الافتراضيات
+        state.settings = Object.assign({
+          theme:'light', backupLimit:10, schoolName:'', schoolType:'بنين', academicYear:'', principalName:'', committeeHead:'', logoDataUrl:''
+        }, obj.settings||{});
+        StorageAPI.saveSettings(state.settings);
+        setTheme();
+        count = state.data.students.length;
       } else {
-        state.data = obj; // استيراد كامل
+        // نفترض أنه هيكل بيانات كامل فقط
+        state.data = obj || {students:[], halls:[], assignments:{}};
         count = state.data.students.length;
       }
       saveAll({withBackup:true});
       renderStudents();
       renderHalls();
+      refreshStats();
     } else if(file.name.endsWith('.csv')){
       count = importStudentsFromCSV(await file.text());
     } else if(/\.xlsx?$/.test(file.name)){
@@ -927,7 +985,10 @@
   }
 
   function initIO(){
-    $('#btnExportJSON').addEventListener('click', exportJSON);
+    // exportFull replaces legacy exportJSON for full backups
+    const btnFull = $('#btnExportFull'); if(btnFull) btnFull.addEventListener('click', exportFull);
+    const btnSaveAs = $('#btnSaveAs'); if(btnSaveAs) btnSaveAs.addEventListener('click', saveAsFull);
+    // keep students-only CSV export for convenience
     $('#btnExportStudentsCSV').addEventListener('click', exportStudentsCSV);
 
     $('#btnImportStudents').addEventListener('click', async ()=>{
@@ -936,7 +997,7 @@
       if(!file){ alert('الرجاء اختيار ملف'); return; }
       try{
         const count = await processImportFile(file);
-        toast(`تم استيراد ${count} طالب`);
+        toast(`تم الاستيراد بنجاح. عدد الطلاب: ${count}`);
       }catch(e){
         alert('فشل الاستيراد: '+ e.message);
         console.error(e);
