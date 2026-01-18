@@ -151,9 +151,8 @@
             <button class="btn btn-ghost" data-clear-sector="${h.id}:${sec.id}"><i class="bi bi-eraser"></i><span>تفريغ القطاع</span></button>
           </div>
           <div class="row-config">
-            <label><span>عدد الصفوف</span><input type="number" min="1" value="${sec.rows?.length||2}" data-sect-rows="${h.id}:${sec.id}" /></label>
-            <label><span>عدد الخطوط (الأعمدة) لكل صف</span><input type="number" min="1" value="${Math.max(...((sec.rows||[ {seats:8},{seats:8} ]).map(r=>r.seats)))}" data-sect-cols="${h.id}:${sec.id}" /></label>
-            <label><span>مقاعد كل صف (مثال: 8,8,7)</span><input type="text" value="${(sec.rows||[ {seats:8},{seats:8} ]).map(r=>r.seats).join(',')}" data-sect-seats="${h.id}:${sec.id}" placeholder="8,8,8"/></label>
+            <label><span>عدد الخطوط (الأعمدة) لكل صف</span><input type="number" min="1" value="${rowsToColHeights(sec.rows||[ {seats:8},{seats:8} ]).length}" data-sect-cols="${h.id}:${sec.id}" /></label>
+            <label><span>مقاعد ضمن عمود (مثال: 6,6,5)</span><input type="text" value="${rowsToColHeights(sec.rows||[ {seats:8},{seats:8} ]).join(',')}" data-sect-seats="${h.id}:${sec.id}" placeholder="6,6,5"/></label>
           </div>
           <div class="capacity">
             <label><span>سعة المقعد</span>
@@ -211,27 +210,23 @@
       });
     });
 
-    wrap.querySelectorAll('[data-sect-rows]').forEach(inp=>{
-      inp.addEventListener('change', ()=>{
-        const [hid,sid] = inp.getAttribute('data-sect-rows').split(':');
-        const hall = state.data.halls.find(h=>h.id===hid);
-        const sec = hall?.sectors?.find(s=>s.id===sid);
-        const n = Math.max(1, parseInt(inp.value||'1',10));
-        const old = (sec.rows||[]).map(r=>r.seats);
-        const next = Array.from({length:n}, (_,i)=>({seats: old[i]||8}));
-        sec.rows = next; saveAll();
-      });
-    });
+    // أُلغي التحكم بعدد الصفوف؛ عدد الصفوف يتحدد من مدخل "مقاعد كل صف"
 
     wrap.querySelectorAll('[data-sect-seats]').forEach(inp=>{
       inp.addEventListener('change', ()=>{
         const [hid,sid] = inp.getAttribute('data-sect-seats').split(':');
         const hall = state.data.halls.find(h=>h.id===hid);
         const sec = hall?.sectors?.find(s=>s.id===sid);
-        const parts = (inp.value||'').split(',').map(s=>parseInt(s.trim(),10)).filter(n=>Number.isFinite(n)&&n>0);
-        if(!parts.length){ alert('صيغة غير صحيحة. مثال: 8,8,7'); return; }
-        sec.rows = parts.map(x=>({seats:x}));
+        const colsHeights = (inp.value||'').split(',').map(s=>parseInt(s.trim(),10)).filter(n=>Number.isFinite(n)&&n>0);
+        if(!colsHeights.length){ alert('صيغة غير صحيحة. مثال: 6,6,5'); return; }
+        const maxRows = Math.max(...colsHeights);
+        const rows = Array.from({length:maxRows}, (_,rowIdx)=>{
+          const seatsInThisRow = colsHeights.filter(h=> h >= (rowIdx+1)).length; // عدد الأعمدة التي تمتد لهذا الصف
+          return {seats: seatsInThisRow};
+        });
+        sec.rows = rows;
         saveAll();
+        renderHalls();
       });
     });
 
@@ -459,6 +454,21 @@
       }
     });
     return list;
+  }
+
+  // Helpers to convert between row counts and column heights
+  function rowsToColHeights(rows){
+    const r = rows||[];
+    const maxCols = Math.max(...r.map(x=> x?.seats||0), 0);
+    const heights = [];
+    for(let c=1;c<=maxCols;c++){
+      let h = 0;
+      for(let i=0;i<r.length;i++){
+        if((r[i]?.seats||0) >= c) h++;
+      }
+      heights.push(h);
+    }
+    return heights;
   }
 
   function clearSectorAssignments(hid, sid){
