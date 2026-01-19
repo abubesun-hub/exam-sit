@@ -12,6 +12,8 @@
       committeeHead:'',
       logoDataUrl:'',
       ministryLogoDataUrl:'',
+      hasSchoolLogo:false,
+      hasMinistryLogo:false,
       backupScheduleEnabled:false,
       backupScheduleTime:'23:00',
       backupScheduleLastRun:'',
@@ -169,7 +171,9 @@
       try{
         const dataUrl = await compressImageFile(file, 600);
         state.settings.logoDataUrl = dataUrl;
+        state.settings.hasSchoolLogo = true;
         saveSettings();
+        try{ await StorageAPI.setAsset('schoolLogo', dataUrl); }catch(e){ console.warn('failed to store school logo in IndexedDB', e); }
         if(logoPreview){ logoPreview.src = state.settings.logoDataUrl; logoPreview.style.display = 'block'; }
         if(logoStatus){ logoStatus.textContent = 'تم الرفع ✓'; }
         applyPrintHeaderPreview();
@@ -181,9 +185,11 @@
 
     if(clearLogoBtn) clearLogoBtn.addEventListener('click', ()=>{
       state.settings.logoDataUrl = '';
+      state.settings.hasSchoolLogo = false;
       saveSettings();
       if(logoPreview){ logoPreview.src=''; logoPreview.style.display='none'; }
       if(logoStatus){ logoStatus.textContent = ''; }
+      StorageAPI.removeAsset('schoolLogo').catch(()=>{});
     });
 
     if(ministryLogoInput) ministryLogoInput.addEventListener('change', async ()=>{
@@ -193,7 +199,9 @@
       try{
         const dataUrl = await compressImageFile(file, 600);
         state.settings.ministryLogoDataUrl = dataUrl;
+        state.settings.hasMinistryLogo = true;
         saveSettings();
+        try{ await StorageAPI.setAsset('ministryLogo', dataUrl); }catch(e){ console.warn('failed to store ministry logo in IndexedDB', e); }
         if(ministryLogoPreview){ ministryLogoPreview.src = state.settings.ministryLogoDataUrl; ministryLogoPreview.style.display = 'block'; }
         if(ministryLogoStatus){ ministryLogoStatus.textContent = 'تم الرفع ✓'; }
         applyPrintHeaderPreview();
@@ -205,9 +213,11 @@
 
     if(clearMinistryLogoBtn) clearMinistryLogoBtn.addEventListener('click', ()=>{
       state.settings.ministryLogoDataUrl = '';
+      state.settings.hasMinistryLogo = false;
       saveSettings();
       if(ministryLogoPreview){ ministryLogoPreview.src=''; ministryLogoPreview.style.display='none'; }
       if(ministryLogoStatus){ ministryLogoStatus.textContent = ''; }
+      StorageAPI.removeAsset('ministryLogo').catch(()=>{});
     });
   }
 
@@ -1349,6 +1359,23 @@
     applyPrintHeaderPreview();
     // إظهار زر الطباعة فقط في تبويب القاعات
     updatePrintButtonVisibility('#dashboard');
+    // جلب الشعارات من IndexedDB بعد التحميل لتجاوز حدود localStorage
+    Promise.all([
+      StorageAPI.getAsset('schoolLogo'),
+      StorageAPI.getAsset('ministryLogo')
+    ]).then(async ([sch,min])=>{
+      // إذا لم يوجد في IndexedDB لكن يوجد في الإعدادات، خزّنه مهاجرةً لضمان الاستمرارية
+      if(!sch && state.settings.logoDataUrl){ try{ await StorageAPI.setAsset('schoolLogo', state.settings.logoDataUrl); sch = state.settings.logoDataUrl; }catch{} }
+      if(!min && state.settings.ministryLogoDataUrl){ try{ await StorageAPI.setAsset('ministryLogo', state.settings.ministryLogoDataUrl); min = state.settings.ministryLogoDataUrl; }catch{} }
+      if(sch){ state.settings.logoDataUrl = sch; state.settings.hasSchoolLogo = true; }
+      if(min){ state.settings.ministryLogoDataUrl = min; state.settings.hasMinistryLogo = true; }
+      // حدث المعاينات إن وجدت
+      const logoPreview = $('#schLogoPreview');
+      const ministryLogoPreview = $('#ministryLogoPreview');
+      if(logoPreview){ if(sch){ logoPreview.src = sch; logoPreview.style.display='block'; } }
+      if(ministryLogoPreview){ if(min){ ministryLogoPreview.src = min; ministryLogoPreview.style.display='block'; } }
+      applyPrintHeaderPreview();
+    }).catch(()=>{});
   }
 
   document.addEventListener('DOMContentLoaded', init);
