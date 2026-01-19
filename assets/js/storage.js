@@ -39,14 +39,9 @@
     try{
       localStorage.setItem(KEYS.DATA, payload);
     }catch(e){
-      console.warn('quota exceeded on DATA, pruning backups...', e);
-      try{
-        pruneBackups();
-        localStorage.setItem(KEYS.DATA, payload);
-      }catch(err){
-        alert('فشل الاستيراد: مساحة التخزين المحلية ممتلئة. تم تقليص النسخ الاحتياطية تلقائياً، إن استمر الخطأ يرجى تصدير البيانات ثم تقليل الحجم (مثلاً عدد النسخ الاحتياطية).');
-        throw err;
-      }
+      // لا تقم بتقليص النسخ الاحتياطية تلقائياً ولا تُظهر تنبيهًا.
+      // المتصفح يفرض حدًا لمساحة localStorage ولا يمكن تجاوزه.
+      console.warn('quota exceeded on DATA (localStorage limit reached). Save skipped.', e);
     }
   }
 
@@ -61,15 +56,8 @@
     try{
       localStorage.setItem(KEYS.SETTINGS, payload);
     }catch(e){
-      // If settings are large (logos as DataURL) and quota is exceeded,
-      // prune backups to free space, then retry once.
-      try{
-        pruneBackups();
-        localStorage.setItem(KEYS.SETTINGS, payload);
-      }catch(err){
-        alert('فشل حفظ الإعدادات: مساحة التخزين المحلية ممتلئة. تم تقليص النسخ الاحتياطية تلقائياً، إن استمر الخطأ قلّل عدد النسخ الاحتياطية أو احذف بعض البيانات ثم أعد المحاولة.');
-        throw err;
-      }
+      // لا تقم بتقليص النسخ الاحتياطية تلقائياً ولا تُظهر تنبيهًا.
+      console.warn('quota exceeded on SETTINGS (localStorage limit reached). Save skipped.', e);
     }
   }
 
