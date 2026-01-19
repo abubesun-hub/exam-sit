@@ -1309,8 +1309,8 @@
     if(!styleEl){ styleEl = document.createElement('style'); styleEl.id='printPageStyle'; styleEl.setAttribute('media','print'); document.head.appendChild(styleEl); }
     const size = (state.settings.printPaperSize||'A4');
     const orientation = (state.settings.printOrientation||'portrait');
-    const margin = Math.max(0, state.settings.printMarginMm||10);
-    styleEl.textContent = `@page{ size: ${size} ${orientation}; margin: ${margin}mm; }\n@media print{ @page{ size: ${size} ${orientation}; } }`;
+    // هوامش الصفحة: أعلى 0.5 سم، يمين/يسار 0.5 سم، أسفل 0.2 سم (لإبقاء الفوتر قريبًا)
+    styleEl.textContent = `@page{ size: ${size} ${orientation}; margin: 0.5cm 0.5cm 0.2cm 0.5cm; }\n@media print{ @page{ size: ${size} ${orientation}; } }`;
   }
 
   function applyPrintHeaderPreview(){
