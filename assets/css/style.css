@@ -148,12 +148,19 @@ body{
   #printHeader{border-bottom:1px solid var(--print-accent)}
   #printFooter{border-top:1px solid var(--print-accent)}
   #printHeader,#printFooter{color: var(--print-text)}
+  #printHeader{position:fixed; top:0; left:0; right:0}
+  #printFooter{position:fixed; bottom:0; left:0; right:0}
+  body{margin-top:80px; margin-bottom:60px}
 }
 
 /* Print-only elements (hidden on screen) */
 .print-only{display:none}
 .print-only .container{width:min(1200px, 94%); margin-inline:auto}
 .print-only .muted{color: var(--muted)}
+
+/* Header preview alignment */
+.ph-right{direction:rtl}
+.ph-left{direction:ltr}
 
 /* Modal */
 .modal.hidden{display:none}

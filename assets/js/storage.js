@@ -57,7 +57,20 @@
   }
 
   function saveSettings(s){
-    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(s||{}));
+    const payload = JSON.stringify(s||{});
+    try{
+      localStorage.setItem(KEYS.SETTINGS, payload);
+    }catch(e){
+      // If settings are large (logos as DataURL) and quota is exceeded,
+      // prune backups to free space, then retry once.
+      try{
+        pruneBackups();
+        localStorage.setItem(KEYS.SETTINGS, payload);
+      }catch(err){
+        alert('فشل حفظ الإعدادات: مساحة التخزين المحلية ممتلئة. تم تقليص النسخ الاحتياطية تلقائياً، إن استمر الخطأ قلّل عدد النسخ الاحتياطية أو احذف بعض البيانات ثم أعد المحاولة.');
+        throw err;
+      }
+    }
   }
 
   function addBackup(snapshot, limit){

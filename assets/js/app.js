@@ -15,12 +15,9 @@
       backupScheduleEnabled:false,
       backupScheduleTime:'23:00',
       backupScheduleLastRun:'',
-      printHeaderText:'',
-      printFooterText:'',
-      printShowSchoolLogo:false,
-      printShowMinistryLogo:false,
-      printShowDate:true,
-      printShowSchoolInfo:true,
+      printHeaderFontFamily:'Tajawal',
+      printHeaderFontSize:18,
+      printHeaderFontColor:'#000000',
       printTextColor:'#000000',
       printAccentColor:'#008080',
       printPaperSize:'A4',
@@ -37,6 +34,35 @@
   const fmt = n => new Intl.NumberFormat('ar-IQ').format(n);
   let dragFromSeat = null;
   let picker = { seatId:null, hid:null, sid:null, capacity:1 };
+
+  async function compressImageFile(file, maxDim=600){
+    return new Promise((resolve, reject)=>{
+      try{
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = ()=>{
+          try{
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            const scale = Math.min(1, maxDim / Math.max(w,h));
+            const cw = Math.max(1, Math.round(w * scale));
+            const ch = Math.max(1, Math.round(h * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = cw; canvas.height = ch;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, cw, ch);
+            let dataUrl = '';
+            try{ dataUrl = canvas.toDataURL('image/webp', 0.85); }
+            catch{ try{ dataUrl = canvas.toDataURL('image/jpeg', 0.85); } catch{ dataUrl = canvas.toDataURL('image/png'); } }
+            URL.revokeObjectURL(url);
+            resolve(String(dataUrl||''));
+          }catch(e){ URL.revokeObjectURL(url); reject(e); }
+        };
+        img.onerror = (e)=>{ URL.revokeObjectURL(url); reject(e); };
+        img.src = url;
+      }catch(e){ reject(e); }
+    });
+  }
 
   function saveAll({withBackup=false}={}){
     StorageAPI.save(state.data);
@@ -122,17 +148,20 @@
     if(principalEl) principalEl.addEventListener('input', ()=>{ state.settings.principalName = principalEl.value.trim(); saveSettings(); });
     if(committeeEl) committeeEl.addEventListener('input', ()=>{ state.settings.committeeHead = committeeEl.value.trim(); saveSettings(); });
 
-    if(logoInput) logoInput.addEventListener('change', ()=>{
+    if(logoInput) logoInput.addEventListener('change', async ()=>{
       const file = logoInput.files?.[0];
       if(!file){ return; }
       if(!file.type.startsWith('image/')){ alert('الرجاء اختيار صورة للشعار'); return; }
-      const reader = new FileReader();
-      reader.onload = ()=>{
-        state.settings.logoDataUrl = String(reader.result||'');
+      try{
+        const dataUrl = await compressImageFile(file, 600);
+        state.settings.logoDataUrl = dataUrl;
         saveSettings();
         if(logoPreview){ logoPreview.src = state.settings.logoDataUrl; logoPreview.style.display = 'block'; }
-      };
-      reader.readAsDataURL(file);
+        applyPrintHeaderPreview();
+      }catch(e){
+        alert('تعذر معالجة الصورة. يرجى اختيار ملف صورة آخر أو تصغير حجمه.');
+        console.error(e);
+      }
     });
 
     if(clearLogoBtn) clearLogoBtn.addEventListener('click', ()=>{
@@ -141,17 +170,20 @@
       if(logoPreview){ logoPreview.src=''; logoPreview.style.display='none'; }
     });
 
-    if(ministryLogoInput) ministryLogoInput.addEventListener('change', ()=>{
+    if(ministryLogoInput) ministryLogoInput.addEventListener('change', async ()=>{
       const file = ministryLogoInput.files?.[0];
       if(!file){ return; }
       if(!file.type.startsWith('image/')){ alert('الرجاء اختيار صورة لشعار الوزارة'); return; }
-      const reader = new FileReader();
-      reader.onload = ()=>{
-        state.settings.ministryLogoDataUrl = String(reader.result||'');
+      try{
+        const dataUrl = await compressImageFile(file, 600);
+        state.settings.ministryLogoDataUrl = dataUrl;
         saveSettings();
         if(ministryLogoPreview){ ministryLogoPreview.src = state.settings.ministryLogoDataUrl; ministryLogoPreview.style.display = 'block'; }
-      };
-      reader.readAsDataURL(file);
+        applyPrintHeaderPreview();
+      }catch(e){
+        alert('تعذر معالجة صورة شعار الوزارة. يرجى اختيار ملف صورة آخر أو تصغير حجمه.');
+        console.error(e);
+      }
     });
 
     if(clearMinistryLogoBtn) clearMinistryLogoBtn.addEventListener('click', ()=>{
@@ -1109,24 +1141,17 @@
     const schTimeEl = $('#backupScheduleTime');
     if(schEnabledEl) schEnabledEl.checked = !!state.settings.backupScheduleEnabled;
     if(schTimeEl) schTimeEl.value = state.settings.backupScheduleTime || '23:00';
-
-    const phText = $('#printHeaderText');
-    const pfText = $('#printFooterText');
-    const pShowSchoolLogo = $('#printShowSchoolLogo');
-    const pShowMinistryLogo = $('#printShowMinistryLogo');
-    const pShowDate = $('#printShowDate');
-    const pShowSchoolInfo = $('#printShowSchoolInfo');
+    const phFontFam = $('#printHeaderFontFamily');
+    const phFontSize = $('#printHeaderFontSize');
+    const phFontColor = $('#printHeaderFontColor');
     const pTextColor = $('#printTextColor');
     const pAccentColor = $('#printAccentColor');
     const pSize = $('#printPaperSize');
     const pOrient = $('#printOrientation');
     const pMargin = $('#printMarginMm');
-    if(phText) phText.value = state.settings.printHeaderText||'';
-    if(pfText) pfText.value = state.settings.printFooterText||'';
-    if(pShowSchoolLogo) pShowSchoolLogo.checked = !!state.settings.printShowSchoolLogo;
-    if(pShowMinistryLogo) pShowMinistryLogo.checked = !!state.settings.printShowMinistryLogo;
-    if(pShowDate) pShowDate.checked = !!state.settings.printShowDate;
-    if(pShowSchoolInfo) pShowSchoolInfo.checked = !!state.settings.printShowSchoolInfo;
+    if(phFontFam) phFontFam.value = state.settings.printHeaderFontFamily||'Tajawal';
+    if(phFontSize) phFontSize.value = String(state.settings.printHeaderFontSize||18);
+    if(phFontColor) phFontColor.value = state.settings.printHeaderFontColor||'#000000';
     if(pTextColor) pTextColor.value = state.settings.printTextColor||'#000000';
     if(pAccentColor) pAccentColor.value = state.settings.printAccentColor||'#008080';
     if(pSize) pSize.value = state.settings.printPaperSize||'A4';
@@ -1138,12 +1163,9 @@
       state.settings.backupLimit = Math.max(1, parseInt($('#backupLimit').value||'10',10));
       if(schEnabledEl) state.settings.backupScheduleEnabled = schEnabledEl.checked;
       if(schTimeEl) state.settings.backupScheduleTime = schTimeEl.value || '23:00';
-      if(phText) state.settings.printHeaderText = phText.value||'';
-      if(pfText) state.settings.printFooterText = pfText.value||'';
-      if(pShowSchoolLogo) state.settings.printShowSchoolLogo = pShowSchoolLogo.checked;
-      if(pShowMinistryLogo) state.settings.printShowMinistryLogo = pShowMinistryLogo.checked;
-      if(pShowDate) state.settings.printShowDate = pShowDate.checked;
-      if(pShowSchoolInfo) state.settings.printShowSchoolInfo = pShowSchoolInfo.checked;
+      if(phFontFam) state.settings.printHeaderFontFamily = phFontFam.value||'Tajawal';
+      if(phFontSize) state.settings.printHeaderFontSize = Math.max(12, parseInt(phFontSize.value||'18',10));
+      if(phFontColor) state.settings.printHeaderFontColor = phFontColor.value||'#000000';
       if(pTextColor) state.settings.printTextColor = pTextColor.value||'#000000';
       if(pAccentColor) state.settings.printAccentColor = pAccentColor.value||'#008080';
       if(pSize) state.settings.printPaperSize = pSize.value||'A4';
@@ -1153,6 +1175,7 @@
       setTheme();
       startBackupScheduler();
       applyPrintSettings();
+      applyPrintHeaderPreview();
       toast('تم حفظ الإعدادات');
     });
 
@@ -1213,32 +1236,29 @@
   function applyPrintSettings(){
     document.documentElement.style.setProperty('--print-text', state.settings.printTextColor||'#000000');
     document.documentElement.style.setProperty('--print-accent', state.settings.printAccentColor||'#008080');
-    const hEl = $('#printHeader');
-    const fEl = $('#printFooter');
-    const hText = $('#printHeaderContent');
-    const fText = $('#printFooterContent');
-    const fDate = $('#printFooterDate');
-    const hMeta = $('#printHeaderMeta');
     const schLogo = $('#printSchoolLogo');
     const minLogo = $('#printMinistryLogo');
-    if(hText) hText.textContent = state.settings.printHeaderText||'';
-    if(fText) fText.textContent = state.settings.printFooterText||'';
-    if(fDate) fDate.textContent = state.settings.printShowDate? new Date().toLocaleDateString('ar-IQ') : '';
-    if(hMeta){
-      if(state.settings.printShowSchoolInfo){
-        const parts = [];
-        if(state.settings.schoolName) parts.push(state.settings.schoolName);
-        if(state.settings.schoolType) parts.push(state.settings.schoolType);
-        if(state.settings.academicYear) parts.push(state.settings.academicYear);
-        hMeta.textContent = parts.join(' – ');
-      } else { hMeta.textContent = ''; }
+    const titleEl = $('#printSchoolTitle');
+    const typeEl = $('#printSchoolType');
+    if(titleEl){
+      titleEl.textContent = state.settings.schoolName || '';
+      titleEl.style.fontFamily = state.settings.printHeaderFontFamily || 'Tajawal';
+      titleEl.style.fontSize = (state.settings.printHeaderFontSize||18) + 'px';
+      titleEl.style.color = state.settings.printHeaderFontColor || '#000000';
+    }
+    if(typeEl){
+      const t = (state.settings.schoolType||'').trim();
+      const map = { 'بنين':'للبنين', 'بنات':'للبنات', 'مختلطة':'مختلطة' };
+      typeEl.textContent = map[t] || t || '';
+      typeEl.style.fontFamily = state.settings.printHeaderFontFamily || 'Tajawal';
+      typeEl.style.color = state.settings.printHeaderFontColor || '#000000';
     }
     if(schLogo){
-      if(state.settings.printShowSchoolLogo && state.settings.logoDataUrl){ schLogo.src = state.settings.logoDataUrl; schLogo.style.display='block'; }
+      if(state.settings.logoDataUrl){ schLogo.src = state.settings.logoDataUrl; schLogo.style.display='block'; }
       else { schLogo.src=''; schLogo.style.display='none'; }
     }
     if(minLogo){
-      if(state.settings.printShowMinistryLogo && state.settings.ministryLogoDataUrl){ minLogo.src = state.settings.ministryLogoDataUrl; minLogo.style.display='block'; }
+      if(state.settings.ministryLogoDataUrl){ minLogo.src = state.settings.ministryLogoDataUrl; minLogo.style.display='block'; }
       else { minLogo.src=''; minLogo.style.display='none'; }
     }
     let styleEl = document.getElementById('printPageStyle');
@@ -1247,6 +1267,34 @@
     const orientation = (state.settings.printOrientation||'portrait');
     const margin = Math.max(0, state.settings.printMarginMm||10);
     styleEl.textContent = `@page{ size: ${size} ${orientation}; margin: ${margin}mm; }`;
+  }
+
+  function applyPrintHeaderPreview(){
+    const titlePrev = $('#phPrevTitle');
+    const typePrev = $('#phPrevType');
+    const schPrev = $('#phPrevSchLogo');
+    const minPrev = $('#phPrevMinLogo');
+    if(titlePrev){
+      titlePrev.textContent = state.settings.schoolName || '';
+      titlePrev.style.fontFamily = state.settings.printHeaderFontFamily || 'Tajawal';
+      titlePrev.style.fontSize = (state.settings.printHeaderFontSize||18) + 'px';
+      titlePrev.style.color = state.settings.printHeaderFontColor || '#000000';
+    }
+    if(typePrev){
+      const t = (state.settings.schoolType||'').trim();
+      const map = { 'بنين':'للبنين', 'بنات':'للبنات', 'مختلطة':'مختلطة' };
+      typePrev.textContent = map[t] || t || '';
+      typePrev.style.fontFamily = state.settings.printHeaderFontFamily || 'Tajawal';
+      typePrev.style.color = state.settings.printHeaderFontColor || '#000000';
+    }
+    if(schPrev){
+      if(state.settings.logoDataUrl){ schPrev.src = state.settings.logoDataUrl; schPrev.style.display='block'; }
+      else { schPrev.src=''; schPrev.style.display='none'; }
+    }
+    if(minPrev){
+      if(state.settings.ministryLogoDataUrl){ minPrev.src = state.settings.ministryLogoDataUrl; minPrev.style.display='block'; }
+      else { minPrev.src=''; minPrev.style.display='none'; }
+    }
   }
 
   // ==== Init ====
@@ -1264,6 +1312,7 @@
     refreshStats();
     startBackupScheduler();
     applyPrintSettings();
+    applyPrintHeaderPreview();
   }
 
   document.addEventListener('DOMContentLoaded', init);
