@@ -14,7 +14,18 @@
       ministryLogoDataUrl:'',
       backupScheduleEnabled:false,
       backupScheduleTime:'23:00',
-      backupScheduleLastRun:''
+      backupScheduleLastRun:'',
+      printHeaderText:'',
+      printFooterText:'',
+      printShowSchoolLogo:false,
+      printShowMinistryLogo:false,
+      printShowDate:true,
+      printShowSchoolInfo:true,
+      printTextColor:'#000000',
+      printAccentColor:'#008080',
+      printPaperSize:'A4',
+      printOrientation:'portrait',
+      printMarginMm:10
     }, StorageAPI.loadSettings()),
     filter:{ studentQuery:'' }
   };
@@ -1099,14 +1110,49 @@
     if(schEnabledEl) schEnabledEl.checked = !!state.settings.backupScheduleEnabled;
     if(schTimeEl) schTimeEl.value = state.settings.backupScheduleTime || '23:00';
 
+    const phText = $('#printHeaderText');
+    const pfText = $('#printFooterText');
+    const pShowSchoolLogo = $('#printShowSchoolLogo');
+    const pShowMinistryLogo = $('#printShowMinistryLogo');
+    const pShowDate = $('#printShowDate');
+    const pShowSchoolInfo = $('#printShowSchoolInfo');
+    const pTextColor = $('#printTextColor');
+    const pAccentColor = $('#printAccentColor');
+    const pSize = $('#printPaperSize');
+    const pOrient = $('#printOrientation');
+    const pMargin = $('#printMarginMm');
+    if(phText) phText.value = state.settings.printHeaderText||'';
+    if(pfText) pfText.value = state.settings.printFooterText||'';
+    if(pShowSchoolLogo) pShowSchoolLogo.checked = !!state.settings.printShowSchoolLogo;
+    if(pShowMinistryLogo) pShowMinistryLogo.checked = !!state.settings.printShowMinistryLogo;
+    if(pShowDate) pShowDate.checked = !!state.settings.printShowDate;
+    if(pShowSchoolInfo) pShowSchoolInfo.checked = !!state.settings.printShowSchoolInfo;
+    if(pTextColor) pTextColor.value = state.settings.printTextColor||'#000000';
+    if(pAccentColor) pAccentColor.value = state.settings.printAccentColor||'#008080';
+    if(pSize) pSize.value = state.settings.printPaperSize||'A4';
+    if(pOrient) pOrient.value = state.settings.printOrientation||'portrait';
+    if(pMargin) pMargin.value = String(state.settings.printMarginMm||10);
+
     $('#btnSaveSettings').addEventListener('click', ()=>{
       state.settings.theme = $('#themeSelect').value;
       state.settings.backupLimit = Math.max(1, parseInt($('#backupLimit').value||'10',10));
       if(schEnabledEl) state.settings.backupScheduleEnabled = schEnabledEl.checked;
       if(schTimeEl) state.settings.backupScheduleTime = schTimeEl.value || '23:00';
+      if(phText) state.settings.printHeaderText = phText.value||'';
+      if(pfText) state.settings.printFooterText = pfText.value||'';
+      if(pShowSchoolLogo) state.settings.printShowSchoolLogo = pShowSchoolLogo.checked;
+      if(pShowMinistryLogo) state.settings.printShowMinistryLogo = pShowMinistryLogo.checked;
+      if(pShowDate) state.settings.printShowDate = pShowDate.checked;
+      if(pShowSchoolInfo) state.settings.printShowSchoolInfo = pShowSchoolInfo.checked;
+      if(pTextColor) state.settings.printTextColor = pTextColor.value||'#000000';
+      if(pAccentColor) state.settings.printAccentColor = pAccentColor.value||'#008080';
+      if(pSize) state.settings.printPaperSize = pSize.value||'A4';
+      if(pOrient) state.settings.printOrientation = pOrient.value||'portrait';
+      if(pMargin) state.settings.printMarginMm = Math.max(0, parseInt(pMargin.value||'10',10));
       StorageAPI.saveSettings(state.settings);
       setTheme();
       startBackupScheduler();
+      applyPrintSettings();
       toast('تم حفظ الإعدادات');
     });
 
@@ -1125,7 +1171,9 @@
       toast('تم إنشاء نسخة احتياطية');
     });
 
-    $('#btnPrint').addEventListener('click', ()=> window.print());
+    const previewBtn = $('#btnPreviewPrint');
+    if(previewBtn){ previewBtn.addEventListener('click', ()=>{ applyPrintSettings(); window.print(); }); }
+    $('#btnPrint').addEventListener('click', ()=>{ applyPrintSettings(); window.print(); });
   }
 
   // ==== Backup Scheduler ====
@@ -1161,6 +1209,46 @@
     backupTimer = setInterval(checkBackupSchedule, 60*1000);
   }
 
+  // ==== Apply Print Settings ====
+  function applyPrintSettings(){
+    document.documentElement.style.setProperty('--print-text', state.settings.printTextColor||'#000000');
+    document.documentElement.style.setProperty('--print-accent', state.settings.printAccentColor||'#008080');
+    const hEl = $('#printHeader');
+    const fEl = $('#printFooter');
+    const hText = $('#printHeaderContent');
+    const fText = $('#printFooterContent');
+    const fDate = $('#printFooterDate');
+    const hMeta = $('#printHeaderMeta');
+    const schLogo = $('#printSchoolLogo');
+    const minLogo = $('#printMinistryLogo');
+    if(hText) hText.textContent = state.settings.printHeaderText||'';
+    if(fText) fText.textContent = state.settings.printFooterText||'';
+    if(fDate) fDate.textContent = state.settings.printShowDate? new Date().toLocaleDateString('ar-IQ') : '';
+    if(hMeta){
+      if(state.settings.printShowSchoolInfo){
+        const parts = [];
+        if(state.settings.schoolName) parts.push(state.settings.schoolName);
+        if(state.settings.schoolType) parts.push(state.settings.schoolType);
+        if(state.settings.academicYear) parts.push(state.settings.academicYear);
+        hMeta.textContent = parts.join(' – ');
+      } else { hMeta.textContent = ''; }
+    }
+    if(schLogo){
+      if(state.settings.printShowSchoolLogo && state.settings.logoDataUrl){ schLogo.src = state.settings.logoDataUrl; schLogo.style.display='block'; }
+      else { schLogo.src=''; schLogo.style.display='none'; }
+    }
+    if(minLogo){
+      if(state.settings.printShowMinistryLogo && state.settings.ministryLogoDataUrl){ minLogo.src = state.settings.ministryLogoDataUrl; minLogo.style.display='block'; }
+      else { minLogo.src=''; minLogo.style.display='none'; }
+    }
+    let styleEl = document.getElementById('printPageStyle');
+    if(!styleEl){ styleEl = document.createElement('style'); styleEl.id='printPageStyle'; document.head.appendChild(styleEl); }
+    const size = (state.settings.printPaperSize||'A4');
+    const orientation = (state.settings.printOrientation||'portrait');
+    const margin = Math.max(0, state.settings.printMarginMm||10);
+    styleEl.textContent = `@page{ size: ${size} ${orientation}; margin: ${margin}mm; }`;
+  }
+
   // ==== Init ====
   function init(){
     setTheme();
@@ -1175,6 +1263,7 @@
     renderHalls();
     refreshStats();
     startBackupScheduler();
+    applyPrintSettings();
   }
 
   document.addEventListener('DOMContentLoaded', init);

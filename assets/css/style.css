@@ -7,6 +7,8 @@
   --accent: #00c2a8;
   --shadow-light: rgba(255,255,255,0.8);
   --shadow-dark: rgba(13, 39, 80, 0.18);
+  --print-text: #000000;
+  --print-accent: #008080;
 }
 :root[data-theme="dark"]{
   --bg: #0f1420;
@@ -138,11 +140,20 @@ body{
 /* Print */
 @media print{
   body{background:#fff}
-  .app-header,.tabs,.app-footer,#students,.io-group,#settings{display:none !important}
+  .app-header,.tabs,.app-footer,#students,.io-group{display:none !important}
   .card{box-shadow:none}
   .seat{border:1px solid #ccc; box-shadow:none}
   .sector{break-inside:avoid}
+  #printHeader,#printFooter{display:block !important}
+  #printHeader{border-bottom:1px solid var(--print-accent)}
+  #printFooter{border-top:1px solid var(--print-accent)}
+  #printHeader,#printFooter{color: var(--print-text)}
 }
+
+/* Print-only elements (hidden on screen) */
+.print-only{display:none}
+.print-only .container{width:min(1200px, 94%); margin-inline:auto}
+.print-only .muted{color: var(--muted)}
 
 /* Modal */
 .modal.hidden{display:none}

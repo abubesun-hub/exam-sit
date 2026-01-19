@@ -240,6 +240,66 @@
           </div>
         </div>
       </div>
+      <div class="card neo mt">
+        <h3>إعدادات الطباعة</h3>
+        <div class="form-grid">
+          <label>
+            <span>عنوان الهيدر</span>
+            <input type="text" id="printHeaderText" placeholder="مثال: خارطة جلوس الامتحان النهائي" />
+          </label>
+          <label>
+            <span>نص الفوتر</span>
+            <input type="text" id="printFooterText" placeholder="مثال: بالتوفيق لجميع الطلبة" />
+          </label>
+          <label>
+            <span>إظهار شعار المدرسة</span>
+            <input type="checkbox" id="printShowSchoolLogo" />
+          </label>
+          <label>
+            <span>إظهار شعار الوزارة</span>
+            <input type="checkbox" id="printShowMinistryLogo" />
+          </label>
+          <label>
+            <span>إظهار التاريخ</span>
+            <input type="checkbox" id="printShowDate" />
+          </label>
+          <label>
+            <span>إظهار معلومات المدرسة</span>
+            <input type="checkbox" id="printShowSchoolInfo" />
+          </label>
+          <label>
+            <span>لون النص</span>
+            <input type="color" id="printTextColor" value="#000000" />
+          </label>
+          <label>
+            <span>لون التمييز</span>
+            <input type="color" id="printAccentColor" value="#008080" />
+          </label>
+          <label>
+            <span>حجم الورق</span>
+            <select id="printPaperSize">
+              <option value="A4">A4</option>
+              <option value="A3">A3</option>
+              <option value="Letter">Letter</option>
+              <option value="Legal">Legal</option>
+            </select>
+          </label>
+          <label>
+            <span>اتجاه الورق</span>
+            <select id="printOrientation">
+              <option value="portrait">عمودي</option>
+              <option value="landscape">أفقي</option>
+            </select>
+          </label>
+          <label>
+            <span>هوامش الصفحة (مم)</span>
+            <input type="number" id="printMarginMm" min="0" max="50" value="10" />
+          </label>
+          <div class="actions">
+            <button class="btn btn-ghost" id="btnPreviewPrint"><i class="bi bi-eye"></i><span>معاينة الطباعة</span></button>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -250,6 +310,23 @@
   </footer>
 
   <!-- نافذة اختيار الطلاب للمقعد -->
+  <!-- عناصر خاصة بالطباعة -->
+  <div id="printHeader" class="print-only neo-surface">
+    <div class="container" style="padding: .8rem 0; display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; align-items:center; gap:.6rem;">
+        <img id="printSchoolLogo" alt="شعار المدرسة" style="height:48px; border-radius:8px; display:none" />
+        <img id="printMinistryLogo" alt="شعار الوزارة" style="height:48px; border-radius:8px; display:none" />
+      </div>
+      <div id="printHeaderContent" style="text-align:center; font-weight:700"></div>
+      <div id="printHeaderMeta" class="muted" style="text-align:end"></div>
+    </div>
+  </div>
+  <div id="printFooter" class="print-only neo-surface">
+    <div class="container" style="padding: .6rem 0; display:flex; align-items:center; justify-content:space-between;">
+      <div id="printFooterContent"></div>
+      <div id="printFooterDate" class="muted"></div>
+    </div>
+  </div>
   <div id="studentPicker" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-panel neo">
