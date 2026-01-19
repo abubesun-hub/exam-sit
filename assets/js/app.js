@@ -10,7 +10,11 @@
       academicYear:'',
       principalName:'',
       committeeHead:'',
-      logoDataUrl:''
+      logoDataUrl:'',
+      ministryLogoDataUrl:'',
+      backupScheduleEnabled:false,
+      backupScheduleTime:'23:00',
+      backupScheduleLastRun:''
     }, StorageAPI.loadSettings()),
     filter:{ studentQuery:'' }
   };
@@ -81,6 +85,9 @@
     const logoInput = $('#schLogo');
     const logoPreview = $('#schLogoPreview');
     const clearLogoBtn = $('#btnClearLogo');
+    const ministryLogoInput = $('#ministryLogo');
+    const ministryLogoPreview = $('#ministryLogoPreview');
+    const clearMinistryLogoBtn = $('#btnClearMinistryLogo');
 
     if(nameEl) nameEl.value = s.schoolName||'';
     if(typeEl) typeEl.value = s.schoolType||'بنين';
@@ -90,6 +97,10 @@
     if(logoPreview){
       if(s.logoDataUrl){ logoPreview.src = s.logoDataUrl; logoPreview.style.display = 'block'; }
       else { logoPreview.src=''; logoPreview.style.display = 'none'; }
+    }
+    if(ministryLogoPreview){
+      if(s.ministryLogoDataUrl){ ministryLogoPreview.src = s.ministryLogoDataUrl; ministryLogoPreview.style.display = 'block'; }
+      else { ministryLogoPreview.src=''; ministryLogoPreview.style.display = 'none'; }
     }
 
     function saveSettings(){ StorageAPI.saveSettings(state.settings); }
@@ -117,6 +128,25 @@
       state.settings.logoDataUrl = '';
       saveSettings();
       if(logoPreview){ logoPreview.src=''; logoPreview.style.display='none'; }
+    });
+
+    if(ministryLogoInput) ministryLogoInput.addEventListener('change', ()=>{
+      const file = ministryLogoInput.files?.[0];
+      if(!file){ return; }
+      if(!file.type.startsWith('image/')){ alert('الرجاء اختيار صورة لشعار الوزارة'); return; }
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        state.settings.ministryLogoDataUrl = String(reader.result||'');
+        saveSettings();
+        if(ministryLogoPreview){ ministryLogoPreview.src = state.settings.ministryLogoDataUrl; ministryLogoPreview.style.display = 'block'; }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if(clearMinistryLogoBtn) clearMinistryLogoBtn.addEventListener('click', ()=>{
+      state.settings.ministryLogoDataUrl = '';
+      saveSettings();
+      if(ministryLogoPreview){ ministryLogoPreview.src=''; ministryLogoPreview.style.display='none'; }
     });
   }
 
@@ -1064,12 +1094,19 @@
   function initSettings(){
     $('#themeSelect').value = state.settings.theme;
     $('#backupLimit').value = state.settings.backupLimit;
+    const schEnabledEl = $('#backupScheduleEnabled');
+    const schTimeEl = $('#backupScheduleTime');
+    if(schEnabledEl) schEnabledEl.checked = !!state.settings.backupScheduleEnabled;
+    if(schTimeEl) schTimeEl.value = state.settings.backupScheduleTime || '23:00';
 
     $('#btnSaveSettings').addEventListener('click', ()=>{
       state.settings.theme = $('#themeSelect').value;
       state.settings.backupLimit = Math.max(1, parseInt($('#backupLimit').value||'10',10));
+      if(schEnabledEl) state.settings.backupScheduleEnabled = schEnabledEl.checked;
+      if(schTimeEl) state.settings.backupScheduleTime = schTimeEl.value || '23:00';
       StorageAPI.saveSettings(state.settings);
       setTheme();
+      startBackupScheduler();
       toast('تم حفظ الإعدادات');
     });
 
@@ -1091,6 +1128,39 @@
     $('#btnPrint').addEventListener('click', ()=> window.print());
   }
 
+  // ==== Backup Scheduler ====
+  let backupTimer = null;
+  function formatTimeHM(d){
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    return `${hh}:${mm}`;
+  }
+  function todayISODate(){
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  function checkBackupSchedule(){
+    if(!state.settings.backupScheduleEnabled) return;
+    const nowHM = formatTimeHM(new Date());
+    const target = state.settings.backupScheduleTime||'23:00';
+    if(nowHM!==target) return;
+    const today = todayISODate();
+    if(state.settings.backupScheduleLastRun===today) return;
+    StorageAPI.addBackup(state.data, state.settings.backupLimit);
+    state.settings.backupScheduleLastRun = today;
+    StorageAPI.saveSettings(state.settings);
+    refreshStats();
+    toast('تم النسخ الاحتياطي المجدول');
+  }
+  function startBackupScheduler(){
+    if(backupTimer){ clearInterval(backupTimer); backupTimer = null; }
+    if(!state.settings.backupScheduleEnabled) return;
+    backupTimer = setInterval(checkBackupSchedule, 60*1000);
+  }
+
   // ==== Init ====
   function init(){
     setTheme();
@@ -1104,6 +1174,7 @@
     renderStudents();
     renderHalls();
     refreshStats();
+    startBackupScheduler();
   }
 
   document.addEventListener('DOMContentLoaded', init);

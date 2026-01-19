@@ -103,8 +103,18 @@
             </label>
             <button class="btn btn-ghost" type="button" id="btnClearLogo"><i class="bi bi-trash"></i><span>إزالة الشعار</span></button>
           </div>
+          <div class="actions">
+            <label style="display:flex; align-items:center; gap:.5rem">
+              <span>شعار الوزارة</span>
+              <input type="file" id="ministryLogo" accept="image/*" />
+            </label>
+            <button class="btn btn-ghost" type="button" id="btnClearMinistryLogo"><i class="bi bi-trash"></i><span>إزالة شعار الوزارة</span></button>
+          </div>
           <div style="grid-column:1/-1">
             <img id="schLogoPreview" alt="شعار المدرسة" style="max-height:90px; border-radius:12px; display:none" />
+          </div>
+          <div style="grid-column:1/-1">
+            <img id="ministryLogoPreview" alt="شعار الوزارة" style="max-height:90px; border-radius:12px; display:none" />
           </div>
         </div>
       </div>
@@ -215,6 +225,14 @@
           <label>
             <span>حدّ أقصى للنسخ الاحتياطية</span>
             <input type="number" id="backupLimit" min="1" max="50" value="10" />
+          </label>
+          <label>
+            <span>تشغيل النسخ الاحتياطي المجدول</span>
+            <input type="checkbox" id="backupScheduleEnabled" />
+          </label>
+          <label>
+            <span>وقت النسخ الاحتياطي اليومي</span>
+            <input type="time" id="backupScheduleTime" value="23:00" />
           </label>
           <div class="actions">
             <button class="btn btn-neo" id="btnSaveSettings"><i class="bi bi-check2-circle"></i><span>حفظ الإعدادات</span></button>
