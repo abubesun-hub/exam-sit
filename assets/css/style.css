@@ -140,7 +140,7 @@ body{
 /* Print */
 @media print{
   body{background:#fff}
-  .app-header,.tabs,.app-footer,#students,.io-group{display:none !important}
+  .app-header,.tabs,.app-footer,.io-group,#dashboard,#students,#io,#settings{display:none !important}
   .card{box-shadow:none}
   .seat{border:1px solid #ccc; box-shadow:none}
   .sector{break-inside:avoid}

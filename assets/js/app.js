@@ -35,7 +35,7 @@
   let dragFromSeat = null;
   let picker = { seatId:null, hid:null, sid:null, capacity:1 };
 
-  async function compressImageFile(file, maxDim=600){
+  async function compressImageFile(file, maxDim=480){
     return new Promise((resolve, reject)=>{
       try{
         const url = URL.createObjectURL(file);
@@ -87,8 +87,16 @@
         const target = btn.getAttribute('data-target');
         $$('.view').forEach(v=>v.classList.remove('active'));
         $(target).classList.add('active');
+        updatePrintButtonVisibility(target);
       });
     });
+  }
+
+  function updatePrintButtonVisibility(activeTarget){
+    const printBtn = $('#btnPrint');
+    if(!printBtn) return;
+    if(activeTarget==='#halls'){ printBtn.style.display = 'inline-flex'; }
+    else { printBtn.style.display = 'none'; }
   }
 
   // ==== Dashboard ====
@@ -122,6 +130,7 @@
     const logoInput = $('#schLogo');
     const logoPreview = $('#schLogoPreview');
     const clearLogoBtn = $('#btnClearLogo');
+    const logoStatus = $('#schLogoStatus');
     const ministryLogoInput = $('#ministryLogo');
     const ministryLogoPreview = $('#ministryLogoPreview');
     const clearMinistryLogoBtn = $('#btnClearMinistryLogo');
@@ -139,6 +148,9 @@
       if(s.ministryLogoDataUrl){ ministryLogoPreview.src = s.ministryLogoDataUrl; ministryLogoPreview.style.display = 'block'; }
       else { ministryLogoPreview.src=''; ministryLogoPreview.style.display = 'none'; }
     }
+    if(logoStatus){ logoStatus.textContent = s.logoDataUrl? 'تم الرفع ✓' : ''; }
+    const ministryLogoStatus = $('#ministryLogoStatus');
+    if(ministryLogoStatus){ ministryLogoStatus.textContent = s.ministryLogoDataUrl? 'تم الرفع ✓' : ''; }
 
     function saveSettings(){ StorageAPI.saveSettings(state.settings); }
 
@@ -157,6 +169,7 @@
         state.settings.logoDataUrl = dataUrl;
         saveSettings();
         if(logoPreview){ logoPreview.src = state.settings.logoDataUrl; logoPreview.style.display = 'block'; }
+        if(logoStatus){ logoStatus.textContent = 'تم الرفع ✓'; }
         applyPrintHeaderPreview();
       }catch(e){
         alert('تعذر معالجة الصورة. يرجى اختيار ملف صورة آخر أو تصغير حجمه.');
@@ -168,6 +181,7 @@
       state.settings.logoDataUrl = '';
       saveSettings();
       if(logoPreview){ logoPreview.src=''; logoPreview.style.display='none'; }
+      if(logoStatus){ logoStatus.textContent = ''; }
     });
 
     if(ministryLogoInput) ministryLogoInput.addEventListener('change', async ()=>{
@@ -179,6 +193,7 @@
         state.settings.ministryLogoDataUrl = dataUrl;
         saveSettings();
         if(ministryLogoPreview){ ministryLogoPreview.src = state.settings.ministryLogoDataUrl; ministryLogoPreview.style.display = 'block'; }
+        if(ministryLogoStatus){ ministryLogoStatus.textContent = 'تم الرفع ✓'; }
         applyPrintHeaderPreview();
       }catch(e){
         alert('تعذر معالجة صورة شعار الوزارة. يرجى اختيار ملف صورة آخر أو تصغير حجمه.');
@@ -190,6 +205,7 @@
       state.settings.ministryLogoDataUrl = '';
       saveSettings();
       if(ministryLogoPreview){ ministryLogoPreview.src=''; ministryLogoPreview.style.display='none'; }
+      if(ministryLogoStatus){ ministryLogoStatus.textContent = ''; }
     });
   }
 
@@ -1195,7 +1211,13 @@
     });
 
     const previewBtn = $('#btnPreviewPrint');
-    if(previewBtn){ previewBtn.addEventListener('click', ()=>{ applyPrintSettings(); window.print(); }); }
+    if(previewBtn){ previewBtn.addEventListener('click', ()=>{
+      // انتقل إلى تبويب القاعات ثم اطبع
+      const hallsTab = Array.from(document.querySelectorAll('.tab')).find(t=> t.getAttribute('data-target')==='#halls');
+      if(hallsTab) hallsTab.click(); else { $$('.view').forEach(v=>v.classList.remove('active')); $('#halls').classList.add('active'); }
+      applyPrintSettings();
+      window.print();
+    }); }
     $('#btnPrint').addEventListener('click', ()=>{ applyPrintSettings(); window.print(); });
   }
 
@@ -1262,11 +1284,11 @@
       else { minLogo.src=''; minLogo.style.display='none'; }
     }
     let styleEl = document.getElementById('printPageStyle');
-    if(!styleEl){ styleEl = document.createElement('style'); styleEl.id='printPageStyle'; document.head.appendChild(styleEl); }
+    if(!styleEl){ styleEl = document.createElement('style'); styleEl.id='printPageStyle'; styleEl.setAttribute('media','print'); document.head.appendChild(styleEl); }
     const size = (state.settings.printPaperSize||'A4');
     const orientation = (state.settings.printOrientation||'portrait');
     const margin = Math.max(0, state.settings.printMarginMm||10);
-    styleEl.textContent = `@page{ size: ${size} ${orientation}; margin: ${margin}mm; }`;
+    styleEl.textContent = `@page{ size: ${size} ${orientation}; margin: ${margin}mm; }\n@media print{ @page{ size: ${size} ${orientation}; } }`;
   }
 
   function applyPrintHeaderPreview(){
@@ -1313,6 +1335,8 @@
     startBackupScheduler();
     applyPrintSettings();
     applyPrintHeaderPreview();
+    // إظهار زر الطباعة فقط في تبويب القاعات
+    updatePrintButtonVisibility('#dashboard');
   }
 
   document.addEventListener('DOMContentLoaded', init);
