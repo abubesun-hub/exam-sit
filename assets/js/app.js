@@ -1174,7 +1174,7 @@
     if(pOrient) pOrient.value = state.settings.printOrientation||'portrait';
     if(pMargin) pMargin.value = String(state.settings.printMarginMm||10);
 
-    $('#btnSaveSettings').addEventListener('click', ()=>{
+    function performSaveSettings(){
       state.settings.theme = $('#themeSelect').value;
       state.settings.backupLimit = Math.max(1, parseInt($('#backupLimit').value||'10',10));
       if(schEnabledEl) state.settings.backupScheduleEnabled = schEnabledEl.checked;
@@ -1193,7 +1193,11 @@
       applyPrintSettings();
       applyPrintHeaderPreview();
       toast('تم حفظ الإعدادات');
-    });
+    }
+    const btnSaveGeneral = $('#btnSaveSettings');
+    if(btnSaveGeneral) btnSaveGeneral.addEventListener('click', performSaveSettings);
+    const btnSavePrint = $('#btnSavePrintSettings');
+    if(btnSavePrint) btnSavePrint.addEventListener('click', performSaveSettings);
 
     $('#btnResetApp').addEventListener('click', ()=>{
       if(!confirm('إرجاع كل البيانات للإفتراضي؟')) return;
