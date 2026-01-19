@@ -20,6 +20,8 @@
       printHeaderFontColor:'#000000',
       printTextColor:'#000000',
       printAccentColor:'#008080',
+      printMinLogoSizePx:48,
+      printSchoolLogoSizePx:48,
       printPaperSize:'A4',
       printOrientation:'portrait',
       printMarginMm:10
@@ -1160,6 +1162,8 @@
     const phFontFam = $('#printHeaderFontFamily');
     const phFontSize = $('#printHeaderFontSize');
     const phFontColor = $('#printHeaderFontColor');
+    const minLogoSizeInp = $('#printMinLogoSizePx');
+    const schLogoSizeInp = $('#printSchoolLogoSizePx');
     const pTextColor = $('#printTextColor');
     const pAccentColor = $('#printAccentColor');
     const pSize = $('#printPaperSize');
@@ -1168,6 +1172,8 @@
     if(phFontFam) phFontFam.value = state.settings.printHeaderFontFamily||'Tajawal';
     if(phFontSize) phFontSize.value = String(state.settings.printHeaderFontSize||18);
     if(phFontColor) phFontColor.value = state.settings.printHeaderFontColor||'#000000';
+    if(minLogoSizeInp) minLogoSizeInp.value = String(state.settings.printMinLogoSizePx||48);
+    if(schLogoSizeInp) schLogoSizeInp.value = String(state.settings.printSchoolLogoSizePx||48);
     if(pTextColor) pTextColor.value = state.settings.printTextColor||'#000000';
     if(pAccentColor) pAccentColor.value = state.settings.printAccentColor||'#008080';
     if(pSize) pSize.value = state.settings.printPaperSize||'A4';
@@ -1182,6 +1188,8 @@
       if(phFontFam) state.settings.printHeaderFontFamily = phFontFam.value||'Tajawal';
       if(phFontSize) state.settings.printHeaderFontSize = Math.max(12, parseInt(phFontSize.value||'18',10));
       if(phFontColor) state.settings.printHeaderFontColor = phFontColor.value||'#000000';
+      if(minLogoSizeInp) state.settings.printMinLogoSizePx = Math.max(16, parseInt(minLogoSizeInp.value||'48',10));
+      if(schLogoSizeInp) state.settings.printSchoolLogoSizePx = Math.max(16, parseInt(schLogoSizeInp.value||'48',10));
       if(pTextColor) state.settings.printTextColor = pTextColor.value||'#000000';
       if(pAccentColor) state.settings.printAccentColor = pAccentColor.value||'#008080';
       if(pSize) state.settings.printPaperSize = pSize.value||'A4';
@@ -1280,11 +1288,11 @@
       typeEl.style.color = state.settings.printHeaderFontColor || '#000000';
     }
     if(schLogo){
-      if(state.settings.logoDataUrl){ schLogo.src = state.settings.logoDataUrl; schLogo.style.display='block'; }
+      if(state.settings.logoDataUrl){ schLogo.src = state.settings.logoDataUrl; schLogo.style.display='block'; schLogo.style.height = (state.settings.printSchoolLogoSizePx||48)+'px'; }
       else { schLogo.src=''; schLogo.style.display='none'; }
     }
     if(minLogo){
-      if(state.settings.ministryLogoDataUrl){ minLogo.src = state.settings.ministryLogoDataUrl; minLogo.style.display='block'; }
+      if(state.settings.ministryLogoDataUrl){ minLogo.src = state.settings.ministryLogoDataUrl; minLogo.style.display='block'; minLogo.style.height = (state.settings.printMinLogoSizePx||48)+'px'; }
       else { minLogo.src=''; minLogo.style.display='none'; }
     }
     let styleEl = document.getElementById('printPageStyle');
@@ -1314,11 +1322,11 @@
       typePrev.style.color = state.settings.printHeaderFontColor || '#000000';
     }
     if(schPrev){
-      if(state.settings.logoDataUrl){ schPrev.src = state.settings.logoDataUrl; schPrev.style.display='block'; }
+      if(state.settings.logoDataUrl){ schPrev.src = state.settings.logoDataUrl; schPrev.style.display='block'; schPrev.style.height = (state.settings.printSchoolLogoSizePx||48)+'px'; }
       else { schPrev.src=''; schPrev.style.display='none'; }
     }
     if(minPrev){
-      if(state.settings.ministryLogoDataUrl){ minPrev.src = state.settings.ministryLogoDataUrl; minPrev.style.display='block'; }
+      if(state.settings.ministryLogoDataUrl){ minPrev.src = state.settings.ministryLogoDataUrl; minPrev.style.display='block'; minPrev.style.height = (state.settings.printMinLogoSizePx||48)+'px'; }
       else { minPrev.src=''; minPrev.style.display='none'; }
     }
   }
